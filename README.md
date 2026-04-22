@@ -21,6 +21,8 @@
 
 R2-D2 Monitor is a high-performance system telemetry console for Windows. It provides real-time monitoring of CPU, RAM, Disk, and Network metrics through a robust Terminal User Interface (TUI) inspired by retro astromech aesthetics.
 
+<img width="1918" height="1011" alt="Screenshot" src="https://github.com/user-attachments/assets/f35f8530-01b2-4385-9812-4b1519f66966" />
+
 ## Key Features
 
 - Real-time Telemetry: Live tracking of system resources and network traffic.
