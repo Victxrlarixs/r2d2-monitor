@@ -1,5 +1,24 @@
 # R2-D2 Monitor
 
+[![](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org)
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=flat&logo=windows11&logoColor=white)](https://www.microsoft.com/windows)
+[![Star Wars](https://img.shields.io/badge/Star%20Wars-000000?style=flat&logo=starwars&logoColor=FFE81F)](https://www.starwars.com)
+
+![Terminal](https://img.shields.io/badge/CLI-Lover-black?style=flat&logo=gnubash&logoColor=white)
+
+```text
+   ___________  
+  /  ___ ___  \ 
+ |  | (O) |  | |
+ |--+-----+--|-|   R2 > *Bleep bloop!*
+ | [=]   [=]   |        Systems online and scanning...
+ | [ ]---[ ]   |        Signal acquired.
+ | [_________] |
+ |   |_____| | |
+ |___|     |___|
+ /____|___|____\
+```
+
 R2-D2 Monitor is a high-performance system telemetry console for Windows. It provides real-time monitoring of CPU, RAM, Disk, and Network metrics through a robust Terminal User Interface (TUI) inspired by retro astromech aesthetics.
 
 ## Key Features
@@ -10,18 +29,6 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 - Persistent Configuration: Remembers user preferences for themes and sorting orders.
 - Responsive Design: Fluid layout that adapts to any terminal size automatically.
 - Asynchronous Logging: Background auditing of system actions and errors.
-
-## Tech Stack
-
-- Language: Go
-- TUI Framework: Bubble Tea
-- Styling: Lipgloss
-- Metrics: gopsutil
-- CLI: Cobra
-
-## Automated Builds
-
-This project uses GitHub Actions for Continuous Integration. On every push or merge to the main branch, a Windows executable is automatically generated. You can find the latest builds in the **Actions** tab of the repository under the "Build and Package R2-D2 Monitor" workflow.
 
 ## Quick Start
 
@@ -52,7 +59,3 @@ For more detailed information, please refer to the documentation in the /docs di
 - [User Guide](docs/user_guide.md): Detailed usage instructions and commands.
 - [Technical Overview](docs/technical_overview.md): Architecture and data flow.
 - [Developer Reference](docs/developer_reference.md): Internal modules and extension guide.
-
-## License
-
-This project is licensed under the MIT License.
