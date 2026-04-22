@@ -19,6 +19,10 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 - Metrics: gopsutil
 - CLI: Cobra
 
+## Automated Builds
+
+This project uses GitHub Actions for Continuous Integration. On every push or merge to the main branch, a Windows executable is automatically generated. You can find the latest builds in the **Actions** tab of the repository under the "Build and Package R2-D2 Monitor" workflow.
+
 ## Installation
 
 ### Prerequisites

@@ -31,5 +31,12 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 3.  **Update**: Metrics are processed, sorted, and stored in the `Model`.
 4.  **Render**: The `View` function calculates terminal dimensions and draws the interface using Lipgloss styles.
 
+## CI/CD Pipeline
+The project utilizes GitHub Actions for automated quality assurance and distribution:
+- **Workflow**: `.github/workflows/build.yml`
+- **Runner**: `windows-latest`
+- **Automation**: Triggered on every push or pull request to the `main` branch.
+- **Artifacts**: Each successful run produces a standalone Windows executable (`r2d2-monitor.exe`) available for download.
+
 ---
 *Status: Production Ready | Architecture: Modular*

@@ -44,7 +44,9 @@ jobs:
           
           This release is automatically updated by GitHub Actions.
         draft: false
-        prerelease: true
+        prerelease: false
+        make_latest: true
+        allowUpdates: true
         files: r2d2-monitor.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
