@@ -1,0 +1,14 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDEs
+.vscode/
+.idea/
+
+# Go
+vendor/
+*.log
