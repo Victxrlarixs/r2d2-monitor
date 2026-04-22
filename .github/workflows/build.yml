@@ -37,16 +37,16 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
-        tag_name: latest
-        name: Latest Build
+        tag_name: v${{ github.run_number }}
+        name: Build ${{ github.run_number }}
         body: |
           Automatic build from the latest commit on the main branch.
           
-          This release is automatically updated by GitHub Actions.
+          Commit: ${{ github.sha }}
         draft: false
         prerelease: false
         make_latest: true
-        allowUpdates: true
+        overwrite_files: true
         files: r2d2-monitor.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
