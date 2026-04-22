@@ -104,6 +104,6 @@ func (m MonitorModel) renderDialogue(W int) string {
 		style = style.Background(lipgloss.Color("#4A0000")).Foreground(lipgloss.Color("#FF6B6B")).Bold(true)
 	}
 
-	// Add vertical padding to the dialogue for a more premium feel
+	// Add vertical padding to the dialogue for a more balanced feel
 	return "\n" + style.Render(prefix+dlText) + "\n"
 }
