@@ -10,6 +10,8 @@ jobs:
   build:
     name: Build Windows Executable
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
     - name: Checkout code
@@ -27,6 +29,22 @@ jobs:
     - name: Build Executable
       run: |
         go build -v -o r2d2-monitor.exe ./cmd/r2d2-monitor
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      with:
+        tag_name: latest
+        name: Latest Build
+        body: |
+          Automatic build from the latest commit on the main branch.
+          
+          This release is automatically updated by GitHub Actions.
+        draft: false
+        prerelease: true
+        files: r2d2-monitor.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
