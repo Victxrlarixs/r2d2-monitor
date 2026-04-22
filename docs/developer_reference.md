@@ -28,6 +28,7 @@ This document provides internal details for developers looking to extend or cont
 ### `StatsManager`
 - **Optimization**: Uses a `tickCount` system to refresh expensive metrics (like Disk or Uptime) less frequently than volatile ones (CPU).
 - **Concurrency**: Parallelizes process polling using a worker pool (goroutines + semaphores) to ensure the UI remains smooth even with 200+ processes.
+- **Robust Parsing**: Implements a dedicated `ParseInt` utility for reliable extraction of numeric data from noisy WMI/PowerShell stdout.
 
 ### `Responsive Layout`
 - The `View()` function in `monitor.go` calculates `topH` (header height) dynamically.
@@ -48,7 +49,7 @@ To add a theme, update `r2d2/ui/themes.go`:
 ```
 
 ## Extending R2-D2 Reactions
-Reactions are defined in `r2d2/ui/reactions.go`. You can add new "Faces" or expand the dialogue pools. Ensure ASCII art is kept at **10 lines** height for layout consistency.
+Reactions are defined in `r2d2/ui/reactions.go`. You can add new "Faces" or expand the dialogue pools. Ensure ASCII art is kept at **10 lines** height for layout consistency. The `monitor.go` Update loop now guarantees a continuous feed of `Idle` messages when no specific action is taking place.
 
 ## Building
 Use the following command to build the project from the root:

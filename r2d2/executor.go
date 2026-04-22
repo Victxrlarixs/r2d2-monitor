@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"time"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // Commander defines the behavior for executing system instructions.
@@ -65,12 +68,51 @@ func KillProcess(pid string) (string, error) {
 	return out.String(), nil
 }
 
-// GetFullProcessInfo retrieves extended metadata for a specific PID using WMI/PowerShell.
-func GetFullProcessInfo(pid string) string {
-	script := fmt.Sprintf("Get-Process -Id %s | Select-Object Path, StartTime, Company, Description | Format-List", pid)
-	out, err := ExecuteCommand(script)
-	if err != nil {
-		return "Scanning error: " + err.Error()
+// GetFullProcessInfo retrieves extended metadata for a specific PID.
+func GetFullProcessInfo(pidStr string) string {
+	var pid int32
+	fmt.Sscanf(pidStr, "%d", &pid)
+	p, err := process.NewProcess(pid)
+	if err != nil { return "Process not found" }
+
+	name, _ := p.Name()
+	status, _ := p.Status()
+	createTime, _ := p.CreateTime()
+	parent, _ := p.Parent()
+	parentPID := int32(0)
+	if parent != nil { parentPID = parent.Pid }
+	
+	cmdLine, _ := p.Cmdline()
+	io, _ := p.IOCounters()
+	mem, _ := p.MemoryInfo()
+
+	elapsed := time.Since(time.Unix(createTime/1000, 0)).Truncate(time.Second)
+
+	res := fmt.Sprintf("STATUS: %s\n", status)
+	res += fmt.Sprintf("ELAPSED: %s\n", elapsed)
+	if io != nil {
+		res += fmt.Sprintf("IO/R: %s\n", formatBytes(io.ReadBytes))
+		res += fmt.Sprintf("IO/W: %s\n", formatBytes(io.WriteBytes))
+	} else {
+		res += "IO/R: 0 B\nIO/W: 0 B\n"
 	}
-	return out
+	res += fmt.Sprintf("PARENT: %d\n", parentPID)
+	if mem != nil {
+		res += fmt.Sprintf("MEM_VAL: %s\n", formatBytes(mem.RSS))
+	}
+	res += fmt.Sprintf("CMD: %s\n", cmdLine)
+	res += fmt.Sprintf("NAME: %s\n", name)
+
+	return res
+}
+
+func formatBytes(b uint64) string {
+	const unit = 1024
+	if b < unit { return fmt.Sprintf("%d B", b) }
+	div, exp := uint64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }

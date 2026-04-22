@@ -22,6 +22,15 @@ Simply run `r2d2-monitor.exe`. R2-D2 will automatically launch in a dedicated te
 
 ---
 
+## New in Ultra-Reloaded
+
+- **NET & IO Panel**: Real-time network latency (Ping), session traffic (GB), and Disk Read/Write speeds (KB/s).
+- **Braille Graphing**: High-resolution network activity graphs using Unicode Braille patterns.
+- **Btop-Style Inspection**: Press `ENTER` to view a detailed multi-column panel with Process IO, Status, Parent PID, and full CMD arguments.
+- **Visible Search**: Press `/` to trigger an interactive search bar for process filtering.
+- **OS Identity**: Displays the native Windows platform name and version.
+- **Terminal Guard**: Automatic warning view if terminal resizes below 90x20.
+
 ## Key Features
 
 ### 1. Deep Scan (Process Metadata)

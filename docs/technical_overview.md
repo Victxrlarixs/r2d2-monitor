@@ -16,6 +16,7 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 3.  **UI (`r2d2/ui/`)**: 
     *   **The Elm Architecture (TEA)**: Predictable state management via `Model`, `Update`, and `View`.
     *   **Modular Rendering**: Sub-components (Header, Dialogue, Table) are decoupled into helper functions for better readability and 100% responsive layout calculation.
+    *   **High-Res Graphing**: Custom Braille-pattern rendering engine for 1D sparklines (Network/IO visualization).
 
 ## Tech Stack
 - **Language**: Go 1.26+
@@ -27,7 +28,7 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 
 ## Data Flow
 1.  **Init**: `main` loads config -> initializes `StatsManager` -> starts Bubble Tea loop.
-2.  **Polling**: Every 2 seconds (or on user action), `fetchStats` triggers a background telemetry scan.
+2.  **Polling**: Every 2 seconds (or on user action), `fetchStats` triggers a background telemetry scan. Custom PowerShell execution supplements `gopsutil` for advanced Windows-native metrics (Disk IO, Ping, Total Threads/Handles).
 3.  **Update**: Metrics are processed, sorted, and stored in the `Model`.
 4.  **Render**: The `View` function calculates terminal dimensions and draws the interface using Lipgloss styles.
 

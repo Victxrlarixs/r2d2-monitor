@@ -3,6 +3,7 @@ module github.com/victx/r2d2-monitor
 go 1.26.2
 
 require (
+	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/shirou/gopsutil/v3 v3.24.5
