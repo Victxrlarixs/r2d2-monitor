@@ -23,25 +23,12 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 
 This project uses GitHub Actions for Continuous Integration. On every push or merge to the main branch, a Windows executable is automatically generated. You can find the latest builds in the **Actions** tab of the repository under the "Build and Package R2-D2 Monitor" workflow.
 
-## Installation
+## Quick Start
 
-### Prerequisites
-- Windows OS
-- Go 1.21 or higher (for building from source)
-
-### Building from Source
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/victx/r2d2-monitor.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd r2d2-monitor
-   ```
-3. Build the executable:
-   ```bash
-   go build -o r2d2-monitor.exe ./cmd/r2d2-monitor
-   ```
+Using R2-D2 Monitor is as easy as:
+1. Go to the [Releases](https://github.com/Victxrlarixs/r2d2-monitor/releases) page.
+2. Download the latest `r2d2-monitor.exe`.
+3. Run it and enjoy! No installation or Go environment required.
 
 ## Usage
 
