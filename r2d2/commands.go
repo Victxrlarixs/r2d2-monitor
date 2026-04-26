@@ -15,9 +15,6 @@ type StatsMsg SysStats
 // ScanResultMsg contains the output of a deep process scan.
 type ScanResultMsg string
 
-// Global manager instance
-var Manager = NewStatsManager()
-
 // Tick creates a command that sends a TickMsg after a short delay.
 func Tick() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
@@ -25,10 +22,11 @@ func Tick() tea.Cmd {
 	})
 }
 
-// GetStatsCmd creates a command that fetches system stats and sends a StatsMsg.
-func GetStatsCmd() tea.Cmd {
+// GetStatsCmd creates a command that fetches system stats using the provided manager.
+// The manager is created once in main and passed through the UI model — no global state.
+func GetStatsCmd(sm *StatsManager) tea.Cmd {
 	return func() tea.Msg {
-		return StatsMsg(Manager.GetStats())
+		return StatsMsg(sm.GetStats())
 	}
 }
 

@@ -28,7 +28,8 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 - Real-time Telemetry: Live tracking of system resources and network traffic.
 - Process Management: Integrated process list with the ability to search and forcefully terminate tasks.
 - Deep Scan: Retrieve extended metadata for any process, including executable paths and developer information.
-- Persistent Configuration: Remembers user preferences for themes and sorting orders.
+- Layout Presets: Four predefined layouts (FULL, COMPACT, NET-FOCUS, CPU-ONLY) optimized for different monitoring scenarios.
+- Persistent Configuration: Remembers user preferences for themes, sorting orders, and layout presets.
 - Responsive Design: Fluid layout that adapts to any terminal size automatically.
 - Asynchronous Logging: Background auditing of system actions and errors.
 
@@ -50,6 +51,7 @@ Run the executable to start the monitor:
 - Navigation: Use Up/Down arrows to move the cursor.
 - Deep Scan: Press Enter to inspect the selected process.
 - Change Theme: Press F3 to cycle through visual styles.
+- Change Layout: Press P to cycle through layout presets (FULL, COMPACT, NET-FOCUS, CPU-ONLY).
 - Search: Press / to filter the process list.
 - Kill Process: Press F9 to terminate the selected task.
 - Quit: Press Q or Esc to exit.

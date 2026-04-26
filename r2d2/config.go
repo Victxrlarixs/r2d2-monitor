@@ -8,15 +8,17 @@ import (
 
 // Config holds the user preferences for the R2-D2 Monitor.
 type Config struct {
-	ThemeIdx int    `json:"theme_idx"`
-	SortBy   string `json:"sort_by"`
+	ThemeIdx     int    `json:"theme_idx"`
+	SortBy       string `json:"sort_by"`
+	LayoutPreset int    `json:"layout_preset"` // 0=full 1=compact 2=cpu-focus 3=proc-only
 }
 
 // DefaultConfig returns the standard settings for a fresh install.
 func DefaultConfig() Config {
 	return Config{
-		ThemeIdx: 0,
-		SortBy:   "CPU",
+		ThemeIdx:     0,
+		SortBy:       "CPU",
+		LayoutPreset: 0,
 	}
 }
 

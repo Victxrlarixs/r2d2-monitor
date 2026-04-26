@@ -3,6 +3,7 @@ package r2d2
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -25,6 +26,17 @@ type ProcessInfo struct {
 	Threads int64
 }
 
+// GPUInfo holds NVIDIA GPU telemetry collected via nvidia-smi.
+type GPUInfo struct {
+	Name        string
+	Utilization float64 // %
+	VRAMUsed    float64 // MB
+	VRAMTotal   float64 // MB
+	Temp        float64 // °C
+	Power       float64 // W
+	Available   bool
+}
+
 // BatteryInfo holds telemetry for the system's power source.
 type BatteryInfo struct {
 	Percent float64
@@ -35,6 +47,7 @@ type BatteryInfo struct {
 type SysStats struct {
 	CPU          float64
 	CPUCores     []float64
+	CPUTemps     []float64 // °C per physical package (index 0 = package avg)
 	RAM          float64
 	RAMUsed      float64
 	RAMTotal     float64
@@ -59,6 +72,7 @@ type SysStats struct {
 	OSName       string
 	CPUModel     string
 	Battery      BatteryInfo
+	GPU          GPUInfo
 	LocalIP      string
 }
 
@@ -72,27 +86,31 @@ type StatsManager struct {
 	lastRefresh time.Time
 	tickCount   uint64
 
-	lastDisk     float64
-	lastDiskUsed float64
+	lastDisk      float64
+	lastDiskUsed  float64
 	lastDiskTotal float64
-	lastUptime   string
+	lastUptime    string
 
 	lastNetRecv uint64
 	lastNetSent uint64
-	lastNetTime time.Time
+	lastNetTime time.Time // timestamp for network KB/s delta
 
 	lastDiskRead  uint64
 	lastDiskWrite uint64
+	lastDiskTime  time.Time // timestamp for disk KB/s delta — separate from net
 	lastPing      int
+
+	lastGPU      GPUInfo   // cached GPU stats (refreshed every 5 ticks)
+	lastCPUTemps []float64 // cached CPU package temps (refreshed every 5 ticks)
 }
 
 // NewStatsManager initializes a new telemetry provider with empty caches.
 func NewStatsManager() *StatsManager {
 	return &StatsManager{
-		procCache:  make(map[int32]*process.Process),
-		nameCache:  make(map[int32]string),
-		cpuCache:   make(map[int32]float64),
-		memCache:   make(map[int32]string),
+		procCache: make(map[int32]*process.Process),
+		nameCache: make(map[int32]string),
+		cpuCache:  make(map[int32]float64),
+		memCache:  make(map[int32]string),
 	}
 }
 
@@ -143,7 +161,9 @@ func (sm *StatsManager) GetStats() SysStats {
 					break
 				}
 			}
-			if stats.LocalIP != "" { break }
+			if stats.LocalIP != "" {
+				break
+			}
 		}
 	}
 
@@ -152,15 +172,25 @@ func (sm *StatsManager) GetStats() SysStats {
 	if strings.Contains(batOut, "EstimatedChargeRemaining") {
 		var b struct {
 			EstimatedChargeRemaining int
-			BatteryStatus           int
+			BatteryStatus            int
 		}
 		if json.Unmarshal([]byte(batOut), &b) == nil {
 			stats.Battery.Percent = float64(b.EstimatedChargeRemaining)
 			statusMap := map[int]string{1: "Discharging", 2: "AC Power", 3: "Fully Charged", 6: "Charging"}
 			stats.Battery.Status = statusMap[b.BatteryStatus]
-			if stats.Battery.Status == "" { stats.Battery.Status = "Unknown" }
+			if stats.Battery.Status == "" {
+				stats.Battery.Status = "Unknown"
+			}
 		}
 	}
+
+	// GPU + CPU temps: refresh every 5 ticks to avoid blocking the UI goroutine.
+	if sm.tickCount%5 == 0 || sm.tickCount == 1 {
+		sm.lastGPU = collectGPU()
+		sm.lastCPUTemps = collectCPUTemps()
+	}
+	stats.GPU = sm.lastGPU
+	stats.CPUTemps = sm.lastCPUTemps
 
 	now := time.Now()
 	if sm.tickCount%10 == 0 || sm.lastRefresh.IsZero() {
@@ -175,7 +205,7 @@ func (sm *StatsManager) GetStats() SysStats {
 			sm.lastDiskUsed = float64(d.Used) / 1024 / 1024 / 1024
 			sm.lastDiskTotal = float64(d.Total) / 1024 / 1024 / 1024
 		}
-		
+
 		if u, err := host.Uptime(); err == nil {
 			sm.lastUptime = fmt.Sprintf("%dd %dh %dm", u/86400, (u%86400)/3600, (u%3600)/60)
 		}
@@ -194,8 +224,8 @@ func (sm *StatsManager) GetStats() SysStats {
 			totalRead += io.ReadBytes
 			totalWrite += io.WriteBytes
 		}
-		if !sm.lastNetTime.IsZero() {
-			dur := now.Sub(sm.lastNetTime).Seconds()
+		if !sm.lastDiskTime.IsZero() {
+			dur := now.Sub(sm.lastDiskTime).Seconds()
 			if dur > 0 {
 				stats.DiskRead = float64(totalRead-sm.lastDiskRead) / 1024 / dur
 				stats.DiskWrite = float64(totalWrite-sm.lastDiskWrite) / 1024 / dur
@@ -203,6 +233,7 @@ func (sm *StatsManager) GetStats() SysStats {
 		}
 		sm.lastDiskRead = totalRead
 		sm.lastDiskWrite = totalWrite
+		sm.lastDiskTime = now
 	}
 
 	if sm.tickCount%10 == 0 || sm.lastPing == 0 {
@@ -350,7 +381,63 @@ func ParseInt(s string) int {
 	return n
 }
 
-// RandomInt returns a random integer in [0, n).
+// RandomInt returns a random integer in [0, n) using math/rand.
 func RandomInt(n int) int {
-	return time.Now().Nanosecond() % n
+	if n <= 0 {
+		return 0
+	}
+	return rand.Intn(n)
+}
+
+// collectGPU queries nvidia-smi for NVIDIA GPU telemetry.
+// Returns an empty GPUInfo{Available:false} when nvidia-smi is absent or fails.
+func collectGPU() GPUInfo {
+	out, err := ExecuteCommand(
+		`nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw --format=csv,noheader,nounits`,
+	)
+	if err != nil || strings.TrimSpace(out) == "" {
+		return GPUInfo{}
+	}
+	fields := strings.Split(strings.TrimSpace(out), ",")
+	if len(fields) < 6 {
+		return GPUInfo{}
+	}
+	var util, vramUsed, vramTotal, temp, power float64
+	fmt.Sscanf(strings.TrimSpace(fields[1]), "%f", &util)
+	fmt.Sscanf(strings.TrimSpace(fields[2]), "%f", &vramUsed)
+	fmt.Sscanf(strings.TrimSpace(fields[3]), "%f", &vramTotal)
+	fmt.Sscanf(strings.TrimSpace(fields[4]), "%f", &temp)
+	fmt.Sscanf(strings.TrimSpace(fields[5]), "%f", &power)
+	return GPUInfo{
+		Name:        strings.TrimSpace(fields[0]),
+		Utilization: util,
+		VRAMUsed:    vramUsed,
+		VRAMTotal:   vramTotal,
+		Temp:        temp,
+		Power:       power,
+		Available:   true,
+	}
+}
+
+// collectCPUTemps queries WMI for CPU package temperatures via PowerShell.
+// On systems where WMI thermal sensors are unavailable it returns nil.
+func collectCPUTemps() []float64 {
+	out, err := ExecuteCommand(
+		`(Get-CimInstance -Namespace root/WMI -ClassName MSAcpi_ThermalZoneTemperature).CurrentTemperature | ForEach-Object { [math]::Round(($_ - 2732) / 10.0, 1) }`,
+	)
+	if err != nil || strings.TrimSpace(out) == "" {
+		return nil
+	}
+	var temps []float64
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var t float64
+		if _, err := fmt.Sscanf(line, "%f", &t); err == nil && t > 0 && t < 120 {
+			temps = append(temps, t)
+		}
+	}
+	return temps
 }

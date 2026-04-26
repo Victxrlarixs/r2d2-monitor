@@ -16,6 +16,7 @@ Simply run `r2d2-monitor.exe`. R2-D2 will automatically launch in a dedicated te
 | `F1` | **Sort by CPU** | Prioritize the list by processor usage. |
 | `F2` | **Sort by RAM** | Prioritize the list by memory footprint. |
 | `F3` | **Change Theme** | Cycle through available visual styles (Amber, Matrix, etc.). |
+| `P` | **Change Layout** | Cycle through layout presets (FULL, COMPACT, NET-FOCUS, CPU-ONLY). |
 | `/` | **Search** | Filter the process list by name. |
 | `F9` | **ZAP (Kill)** | Forcefully terminate the selected process and its children. |
 | `Q` / `Ctrl+C` | **Quit** | Shut down R2-D2 and exit the console. |
@@ -27,9 +28,14 @@ Simply run `r2d2-monitor.exe`. R2-D2 will automatically launch in a dedicated te
 - **NET & IO Panel**: Real-time network latency (Ping), session traffic (GB), and Disk Read/Write speeds (KB/s).
 - **Braille Graphing**: High-resolution network activity graphs using Unicode Braille patterns.
 - **Btop-Style Inspection**: Press `ENTER` to view a detailed multi-column panel with Process IO, Status, Parent PID, and full CMD arguments.
+- **Layout Presets**: Press `P` to cycle through four optimized layouts:
+  - **FULL**: Complete interface with all panels visible
+  - **COMPACT**: No R2-D2 box, maximized process list space
+  - **NET-FOCUS**: Enlarged network panel for network monitoring
+  - **CPU-ONLY**: Minimal layout showing only CPU and processes
 - **Visible Search**: Press `/` to trigger an interactive search bar for process filtering.
 - **OS Identity**: Displays the native Windows platform name and version.
-- **Terminal Guard**: Automatic warning view if terminal resizes below 90x20.
+- **Terminal Guard**: Automatic warning view if terminal resizes below 80x20.
 
 ## Key Features
 
@@ -46,7 +52,7 @@ The top header provides a high-density overview of your system's health:
 - **Uptime**: How long your droid (system) has been operational.
 
 ### 3. Persistent Memory
-R2-D2 remembers your preferences! Your chosen **Theme** and **Sort Order** are saved to a local config file and restored automatically every time you launch the app.
+R2-D2 remembers your preferences! Your chosen **Theme**, **Sort Order**, and **Layout Preset** are saved to a local config file and restored automatically every time you launch the app.
 
 ---
 

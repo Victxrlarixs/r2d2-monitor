@@ -14,6 +14,7 @@ import (
 type MonitorModel struct {
 	Stats           r2d2.SysStats
 	Config          r2d2.Config
+	SM              *r2d2.StatsManager // single source of truth, created in main
 	Width           int
 	Height          int
 	Ready           bool
@@ -30,13 +31,18 @@ type MonitorModel struct {
 	NetSentHistory  []float64
 	Details         string
 	SelectedProcess r2d2.ProcessInfo
+	
+	// Layout preset system
+	PresetController *PresetController
 }
 
 func InitialMonitor(sm *r2d2.StatsManager, cfg r2d2.Config) MonitorModel {
 	m := MonitorModel{
+		SM:          sm,
 		Config:      cfg,
 		CurrentFace: "idle",
 		Sorting:     "cpu",
+		PresetController: NewPresetController(cfg.LayoutPreset),
 	}
 	m.setReaction("idle", 0)
 	return m
@@ -102,7 +108,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentFace == "idle" && !m.SearchMode && !m.Inspecting { m.setReaction("idle", 0) }
 		cmds = append(cmds, m.idleMsgCmd())
 	case r2d2.TickMsg:
-		cmds = append(cmds, r2d2.GetStatsCmd(), r2d2.Tick())
+		cmds = append(cmds, r2d2.GetStatsCmd(m.SM), r2d2.Tick())
 		if m.Inspecting {
 			cmds = append(cmds, r2d2.ScanProcessCmd(m.SelectedProcess.ID))
 		}
@@ -129,6 +135,12 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if msg.Type == tea.KeyBackspace && len(m.SearchQuery) > 0 { m.SearchQuery = m.SearchQuery[:len(m.SearchQuery)-1] }
 			if msg.Type == tea.KeyRunes { m.SearchQuery += msg.String() }
+			// Check easter eggs on every keystroke
+			if egg, ok := R2EasterEggs[strings.ToLower(m.SearchQuery)]; ok {
+				m.DisplayMsg = egg
+				m.CurrentFace = "scanning"
+				m.MsgLockedUntil = time.Now().Add(time.Second * 4)
+			}
 			return m, nil
 		}
 		switch {
@@ -154,6 +166,33 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Config.ThemeIdx = (m.Config.ThemeIdx + 1) % len(Themes)
 			m.setReaction("success", time.Second)
 			r2d2.SaveConfig(m.Config)
+		case key.Matches(msg, DefaultKeyMap.Preset):
+			// Handle preset cycling
+			oldPreset := m.PresetController.GetCurrentPresetNumber()
+			err := m.PresetController.CyclePreset()
+			if err == nil {
+				newPreset := m.PresetController.GetCurrentPresetNumber()
+				// Update config and save
+				m.Config.LayoutPreset = newPreset
+				r2d2.SaveConfig(m.Config)
+				
+				// Trigger appropriate R2-D2 reaction
+				oldConfig, _ := GetPresetConfig(oldPreset)
+				newConfig, _ := GetPresetConfig(newPreset)
+				
+				if oldConfig != nil && newConfig != nil {
+					if oldConfig.ShowR2D2 && !newConfig.ShowR2D2 {
+						// R2-D2 is being hidden - farewell reaction
+						m.setReaction("success", time.Second*2)
+					} else if !oldConfig.ShowR2D2 && newConfig.ShowR2D2 {
+						// R2-D2 is being shown - greeting reaction
+						m.setReaction("success", time.Second*2)
+					} else if newConfig.ShowR2D2 {
+						// R2-D2 stays visible - positive reaction
+						m.setReaction("success", time.Second*2)
+					}
+				}
+			}
 		case key.Matches(msg, DefaultKeyMap.Search): 
 			m.SearchMode, m.SearchQuery = true, ""
 			m.setReaction("thinking", 0)
@@ -170,47 +209,87 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m MonitorModel) View() string {
 	if m.Width == 0 || m.Height == 0 { return "Initializing..." }
-	if m.Width < 90 || m.Height < 20 {
+	if m.Width < 80 || m.Height < 20 {
 		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center,
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#FF1744")).Bold(true).
-				Render(fmt.Sprintf("TERMINAL TOO SMALL (%dx%d)\nMINIMUM REQUIRED: 90x20", m.Width, m.Height)))
+				Render(fmt.Sprintf("TERMINAL TOO SMALL (%dx%d)\nMINIMUM REQUIRED: 80x20", m.Width, m.Height)))
 	}
+	
 	theme := Themes[m.Config.ThemeIdx]
 	W, H := m.Width, m.Height
+	
 	if !m.Ready {
 		art := strings.Join(R2Reactions["idle"].Art, "\n")
 		return lipgloss.Place(W, H, lipgloss.Center, lipgloss.Center, lipgloss.NewStyle().Foreground(theme.CPU).Render(art))
 	}
 
-	leftW := int(float64(W) * 0.38)
-	if leftW < 36 { leftW = 36 }
-	rightW := W - leftW
-	topH := 10
-	bottomH := H - topH - 1
-
-	r2Box := m.renderR2Box(leftW, topH, theme)
-	cpuBox := m.renderCPUBox(rightW, topH, theme)
-	topRow := lipgloss.JoinHorizontal(lipgloss.Top, r2Box, cpuBox)
-
-	memH, diskH := 8, 6
-	netH := bottomH - memH - diskH
-	if netH < 5 { netH = 5 }
-
-	memBox := m.renderMemBox(leftW, memH, theme)
-	diskBox := m.renderDiskBox(leftW, diskH, theme)
-	netBox := m.renderNetBox(leftW, netH, theme)
-	leftCol := lipgloss.JoinVertical(lipgloss.Left, memBox, diskBox, netBox)
-
-	procBox := m.renderProcBox(rightW, bottomH, theme)
-	mainContent := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, procBox)
-
+	// Get layout dimensions from preset controller
+	dims := m.PresetController.CalculateDimensions(W, H)
+	layout := m.PresetController.GetCurrentLayout()
+	
+	var topRow string
+	var leftCol string
+	var rightCol string
+	
+	// Build top row based on layout configuration
+	if layout.ShowR2D2 && layout.ShowCPU {
+		r2Box := m.renderR2Box(dims.R2D2Box.Width, dims.R2D2Box.Height, theme)
+		cpuBox := m.renderCPUBox(dims.CPUBox.Width, dims.CPUBox.Height, theme)
+		topRow = lipgloss.JoinHorizontal(lipgloss.Top, r2Box, cpuBox)
+	} else if layout.ShowCPU {
+		cpuBox := m.renderCPUBox(dims.CPUBox.Width, dims.CPUBox.Height, theme)
+		topRow = cpuBox
+	}
+	
+	// Build left column panels
+	var leftPanels []string
+	if layout.ShowMemory && dims.MemoryBox.Width > 0 {
+		leftPanels = append(leftPanels, m.renderMemBox(dims.MemoryBox.Width, dims.MemoryBox.Height, theme))
+	}
+	if layout.ShowDisk && dims.DiskBox.Width > 0 {
+		leftPanels = append(leftPanels, m.renderDiskBox(dims.DiskBox.Width, dims.DiskBox.Height, theme))
+	}
+	if layout.ShowNetwork && dims.NetworkBox.Width > 0 {
+		leftPanels = append(leftPanels, m.renderNetBox(dims.NetworkBox.Width, dims.NetworkBox.Height, theme))
+	}
+	
+	if len(leftPanels) > 0 {
+		leftCol = lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
+	}
+	
+	// Build process panel
+	if layout.ShowProcess && dims.ProcessBox.Width > 0 {
+		rightCol = m.renderProcBox(dims.ProcessBox.Width, dims.ProcessBox.Height, theme)
+	}
+	
+	// Combine main content
+	var mainContent string
+	if leftCol != "" && rightCol != "" {
+		mainContent = lipgloss.JoinHorizontal(lipgloss.Top, leftCol, rightCol)
+	} else if rightCol != "" {
+		mainContent = rightCol
+	} else if leftCol != "" {
+		mainContent = leftCol
+	}
+	
+	// Build footer with preset indicator
 	uptime := fmt.Sprintf(" UP: %s ", m.Stats.Uptime)
-	keys := " [↑↓] NAV  [ENTER] SCAN  [F1/F2] SORT  [F3] THEME  [/] SEARCH  [F9] KILL  [Q] QUIT "
+	presetName := fmt.Sprintf(" PRESET: %s ", m.PresetController.GetCurrentPresetName())
+	keys := " [↑↓] NAV  [ENTER] SCAN  [F1/F2] SORT  [F3] THEME  [P] PRESET  [/] SEARCH  [F9] KILL  [Q] QUIT "
 	footerSt := lipgloss.NewStyle().Background(theme.CPU).Foreground(lipgloss.Color("#000000")).Bold(true)
-	footer := footerSt.Render(fmt.Sprintf(" %-15s %-15s %s", fmt.Sprintf("%d PROCS", len(m.visibleEntries())), uptime, keys))
+	footer := footerSt.Render(fmt.Sprintf(" %-15s %-15s %-15s %s", fmt.Sprintf("%d PROCS", len(m.visibleEntries())), uptime, presetName, keys))
 	footer = lipgloss.NewStyle().Width(W).Background(lipgloss.Color("#161B22")).Render(footer)
 
-	view := lipgloss.JoinVertical(lipgloss.Left, topRow, mainContent, footer)
+	// Combine everything
+	var view string
+	if topRow != "" && mainContent != "" {
+		view = lipgloss.JoinVertical(lipgloss.Left, topRow, mainContent, footer)
+	} else if mainContent != "" {
+		view = lipgloss.JoinVertical(lipgloss.Left, mainContent, footer)
+	} else {
+		view = footer
+	}
+	
 	return lipgloss.NewStyle().MarginTop(1).Render(view)
 }
 
@@ -297,7 +376,7 @@ func truncate(s string, l int) string {
 }
 
 type KeyMap struct {
-	Up, Down, Quit, Theme, Search, Kill, SortCPU, SortMem key.Binding
+	Up, Down, Quit, Theme, Search, Kill, SortCPU, SortMem, Preset key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
@@ -309,4 +388,5 @@ var DefaultKeyMap = KeyMap{
 	Kill:    key.NewBinding(key.WithKeys("f9")),
 	SortCPU: key.NewBinding(key.WithKeys("f1")),
 	SortMem: key.NewBinding(key.WithKeys("f2")),
+	Preset:  key.NewBinding(key.WithKeys("p")),
 }
