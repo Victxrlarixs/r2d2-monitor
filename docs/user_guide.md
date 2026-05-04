@@ -4,7 +4,7 @@ Welcome to the **R2-D2 Monitor**, a high-performance system telemetry console wi
 
 ## Getting Started
 
-Simply run `r2d2-monitor.exe`. R2-D2 will automatically launch in a dedicated terminal window and begin scanning your system.
+Simply run `r2d2-monitor-portable.exe`. R2-D2 will automatically launch in a dedicated terminal window and begin scanning your system.
 
 ### Controls & Navigation
 

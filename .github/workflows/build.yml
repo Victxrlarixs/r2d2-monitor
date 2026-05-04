@@ -31,7 +31,7 @@ jobs:
 
     - name: Build Executable
       run: |
-        go build -v -o r2d2-monitor.exe ./cmd/r2d2-monitor
+        go build -v -o r2d2-monitor-portable.exe ./cmd/r2d2-monitor
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
@@ -46,14 +46,14 @@ jobs:
         prerelease: false
         make_latest: true
         overwrite_files: true
-        files: r2d2-monitor.exe
+        files: r2d2-monitor-portable.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: r2d2-monitor-windows-x64
-        path: r2d2-monitor.exe
+        name: r2d2-monitor-portable-windows-x64
+        path: r2d2-monitor-portable.exe
         if-no-files-found: error
         retention-days: 7
