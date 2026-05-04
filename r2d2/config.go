@@ -43,8 +43,10 @@ func LoadConfig() Config {
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
+		LogError(err, "Failed to unmarshal config")
 		return DefaultConfig()
 	}
+	LogInfo("Configuration loaded successfully")
 	return cfg
 }
 
@@ -53,7 +55,12 @@ func SaveConfig(cfg Config) error {
 	path := GetConfigPath()
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
+		LogError(err, "Failed to marshal config")
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	err = os.WriteFile(path, data, 0644)
+	if err != nil {
+		LogError(err, "Failed to write config file")
+	}
+	return err
 }

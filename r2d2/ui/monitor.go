@@ -193,6 +193,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, DefaultKeyMap.Tab):
 			m.Focus = (m.Focus + 1) % 3
+			r2d2.LogAction("UI", fmt.Sprintf("Focus changed to mode %d", m.Focus))
 			m.setReaction("thinking", time.Second)
 		case msg.Type == tea.KeyEnter:
 			m.Inspecting = !m.Inspecting
@@ -202,6 +203,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.SelectedProcess = entries[m.Cursor]
 					m.setReaction("scanning", 0)
 					m.Details = "SCANNING..."
+					r2d2.LogAction("UI", fmt.Sprintf("Inspecting process: %s (PID %s)", m.SelectedProcess.Name, m.SelectedProcess.ID))
 					cmds = append(cmds, r2d2.ScanProcessCmd(m.SelectedProcess.ID))
 				}
 			} else { m.setReaction("idle", 0) }
@@ -209,6 +211,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, DefaultKeyMap.SortMem): m.Sorting = "mem" ; m.setReaction("thinking", time.Second*2)
 		case key.Matches(msg, DefaultKeyMap.Theme):
 			m.Config.ThemeIdx = (m.Config.ThemeIdx + 1) % len(Themes)
+			r2d2.LogAction("UI", fmt.Sprintf("Theme changed to: %s", Themes[m.Config.ThemeIdx].Name))
 			m.setReaction("success", time.Second)
 			r2d2.SaveConfig(m.Config)
 		case key.Matches(msg, DefaultKeyMap.Preset):
@@ -219,6 +222,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				newPreset := m.PresetController.GetCurrentPresetNumber()
 				// Update config and save
 				m.Config.LayoutPreset = newPreset
+				r2d2.LogAction("UI", fmt.Sprintf("Layout preset changed to: %s", m.PresetController.GetCurrentPresetName()))
 				r2d2.SaveConfig(m.Config)
 				
 				// Trigger appropriate R2-D2 reaction
@@ -240,6 +244,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, DefaultKeyMap.Search): 
 			m.SearchMode, m.SearchQuery = true, ""
+			r2d2.LogAction("UI", "Search mode activated")
 			m.setReaction("thinking", 0)
 		case key.Matches(msg, DefaultKeyMap.Kill):
 			entries := m.visibleEntries()
@@ -461,6 +466,7 @@ func (m *MonitorModel) cycleDisk(delta int) {
 	if idx == -1 { idx = 0 }
 	idx = (idx + delta + len(m.Stats.AllDisks)) % len(m.Stats.AllDisks)
 	m.Config.SelectedDisk = m.Stats.AllDisks[idx]
+	r2d2.LogAction("CONFIG", fmt.Sprintf("Selected disk changed to %s", m.Config.SelectedDisk))
 	r2d2.SaveConfig(m.Config)
 }
 
@@ -473,6 +479,7 @@ func (m *MonitorModel) cycleNet(delta int) {
 	if idx == -1 { idx = 0 }
 	idx = (idx + delta + len(m.Stats.AllNet)) % len(m.Stats.AllNet)
 	m.Config.SelectedNetInt = m.Stats.AllNet[idx]
+	r2d2.LogAction("CONFIG", fmt.Sprintf("Selected network adapter changed to %s", m.Config.SelectedNetInt))
 	r2d2.SaveConfig(m.Config)
 }
 

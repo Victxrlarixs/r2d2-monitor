@@ -63,8 +63,10 @@ func KillProcess(pid string) (string, error) {
 		if msg == "" {
 			msg = err.Error()
 		}
+		LogError(err, fmt.Sprintf("Failed to kill PID %s", pid))
 		return msg, fmt.Errorf("taskkill error: %s", msg)
 	}
+	LogAction("KILL", fmt.Sprintf("Successfully terminated PID %s", pid))
 	return out.String(), nil
 }
 
