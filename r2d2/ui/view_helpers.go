@@ -192,8 +192,16 @@ func (m MonitorModel) renderDiskBox(w, h int, theme Theme) string {
 	detailSt := lipgloss.NewStyle().Foreground(lipgloss.Color("#8B949E"))
 	ioSt     := lipgloss.NewStyle().Foreground(theme.DSK).Bold(true)
 
-	// C: usage bar
-	b.WriteString(fmt.Sprintf(" C:   %s %s\n",
+	title := " DISKS "
+	if m.Focus == FocusDisk {
+		title = " > DISKS (↑/↓) "
+		dskColor = theme.CPU // Highlight border
+	}
+
+	// Disk usage bar
+	diskLabel := fmt.Sprintf(" %-4s", truncate(m.Stats.SelectedDisk, 4))
+	b.WriteString(fmt.Sprintf("%s %s %s\n",
+		diskLabel,
 		ProgressBar(m.Stats.Disk, barW, dskColor),
 		pctSt.Render(fmt.Sprintf("%5.1f%%", m.Stats.Disk)),
 	))
@@ -207,7 +215,7 @@ func (m MonitorModel) renderDiskBox(w, h int, theme Theme) string {
 		rdLabel, detailSt.Render(fmt.Sprintf("%7.1f KB/s", m.Stats.DiskRead)),
 		wrLabel, detailSt.Render(fmt.Sprintf("%7.1f KB/s", m.Stats.DiskWrite)),
 	))
-	return RenderBox(w, h, " DISKS ", b.String(), theme.DSK)
+	return RenderBox(w, h, title, b.String(), dskColor)
 }
 
 // ── ASTROMECH ────────────────────────────────────────────────────────────────
@@ -251,7 +259,17 @@ func (m MonitorModel) renderNetBox(w, h int, theme Theme) string {
 	cyan   := lipgloss.Color("#00E5FF")
 	gray   := lipgloss.Color("#8B949E")
 
-	// Header: IP + ping
+	title := " NET "
+	borderCol := green
+	if m.Focus == FocusNet {
+		title = " > NET (↑/↓) "
+		borderCol = lipgloss.Color("#FFFFFF")
+	}
+
+	// Header: Interface + IP + ping
+	b.WriteString(lipgloss.NewStyle().Foreground(gray).Render(" DEV: ") +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render(truncate(m.Stats.SelectedNet, 12)) + "\n")
+
 	pingSt := lipgloss.NewStyle().Foreground(cyan).Bold(true)
 	pingColor := green
 	if m.Stats.NetPing > 100 { pingColor = lipgloss.Color("#FFAB40") }
@@ -276,5 +294,5 @@ func (m MonitorModel) renderNetBox(w, h int, theme Theme) string {
 	b.WriteString(lipgloss.NewStyle().Foreground(gray).Render(
 		fmt.Sprintf(" Total ↑ %.2fG  ↓ %.2fG\n", m.Stats.TotalNetSent, m.Stats.TotalNetRecv)))
 
-	return RenderBox(w, h, " NET ", b.String(), green)
+	return RenderBox(w, h, title, b.String(), borderCol)
 }

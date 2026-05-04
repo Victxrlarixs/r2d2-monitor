@@ -9,7 +9,7 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 ### Core Layers:
 1.  **Entry Point (`cmd/r2d2-monitor`)**: Handles application bootstrapping, terminal initialization, and the "Mousetrap" bypass for Windows double-click support.
 2.  **Engine (`r2d2/`)**:
-    *   `StatsManager`: Encapsulated telemetry provider using `gopsutil`. Features a thread-safe cache and smart polling (prioritizing high-CPU tasks).
+    *   `StatsManager`: Encapsulated telemetry provider using `gopsutil` and native WMI. Features a thread-safe cache and prioritized polling (High-priority for visible/active processes).
     *   `Executor`: abstraction layer for OS-level commands (Taskkill, PowerShell/WMI).
     *   `Config`: Persistence layer for user settings using JSON.
     *   `Logger`: Asynchronous file-based logging for auditing system actions.
@@ -24,11 +24,11 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 - **Styling**: `charmbracelet/lipgloss`
 - **Metrics**: `shirou/gopsutil`
 - **CLI Framework**: `spf13/cobra`
-- **OS Integration**: PowerShell Core / WMI / Taskkill
+- **OS Integration**: Native WMI (via `yusufpapurcu/wmi`) / Taskkill / Standard TCP Ping
 
 ## Data Flow
 1.  **Init**: `main` loads config -> initializes `StatsManager` -> starts Bubble Tea loop.
-2.  **Polling**: Every 2 seconds (or on user action), `fetchStats` triggers a background telemetry scan. Custom PowerShell execution supplements `gopsutil` for advanced Windows-native metrics (Disk IO, Ping, Total Threads/Handles).
+2.  **Polling**: Every second, a background telemetry scan is triggered. The engine uses native WMI/Go calls for advanced metrics (Battery, Temperature, Latency) and utilizes a prioritized polling strategy to minimize CPU footprint.
 3.  **Update**: Metrics are processed, sorted, and stored in the `Model`.
 4.  **Render**: The `View` function calculates terminal dimensions and draws the interface using Lipgloss styles.
 

@@ -25,13 +25,13 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 
 ## Key Features
 
-- Real-time Telemetry: Live tracking of system resources and network traffic.
-- Process Management: Integrated process list with the ability to search and forcefully terminate tasks.
-- Deep Scan: Retrieve extended metadata for any process, including executable paths and developer information.
+- Real-time Telemetry: Live tracking of system resources, network traffic, and multi-vendor GPUs (NVIDIA/AMD/Intel).
+- Hardware Browsing: Ability to cycle through different disk drives and network adapters for detailed monitoring.
+- Process Management: Integrated process list with search, deep scan, and safe termination with confirmation.
+- Performance Optimized: Throttled polling logic that prioritizes visible processes to ensure low overhead.
+- Portability: Zero installation; configuration and logs are kept in the executable's directory.
 - Layout Presets: Four predefined layouts (FULL, COMPACT, NET-FOCUS, CPU-ONLY) optimized for different monitoring scenarios.
-- Persistent Configuration: Remembers user preferences for themes, sorting orders, and layout presets.
 - Responsive Design: Fluid layout that adapts to any terminal size automatically.
-- Asynchronous Logging: Background auditing of system actions and errors.
 
 ## Quick Start
 
@@ -48,12 +48,13 @@ Run the executable to start the monitor:
 ```
 
 ### Basic Controls
-- Navigation: Use Up/Down arrows to move the cursor.
+- Navigation: Use Up/Down arrows to move the cursor or cycle hardware.
+- Switch Focus: Press TAB to toggle focus between Processes, Disks, and Network panels.
 - Deep Scan: Press Enter to inspect the selected process.
 - Change Theme: Press F3 to cycle through visual styles.
-- Change Layout: Press P to cycle through layout presets (FULL, COMPACT, NET-FOCUS, CPU-ONLY).
+- Change Layout: Press P to cycle through layout presets.
 - Search: Press / to filter the process list.
-- Kill Process: Press F9 to terminate the selected task.
+- Kill Process: Press F9, then Y to confirm termination.
 - Quit: Press Q or Esc to exit.
 
 ## Documentation

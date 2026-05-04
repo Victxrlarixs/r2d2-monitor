@@ -1,9 +1,9 @@
 package r2d2
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
+	stdnet "net"
 	"sort"
 	"strings"
 	"sync"
@@ -15,7 +15,25 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
+	"github.com/yusufpapurcu/wmi"
 )
+
+// Win32_Battery WMI struct
+type Win32_Battery struct {
+	EstimatedChargeRemaining uint16
+	BatteryStatus            uint16
+}
+
+// MSAcpi_ThermalZoneTemperature WMI struct
+type MSAcpi_ThermalZoneTemperature struct {
+	CurrentTemperature uint32
+}
+
+// Win32_VideoController WMI struct for generic GPU info
+type Win32_VideoController struct {
+	Name       string
+	AdapterRAM uint64
+}
 
 // ProcessInfo holds summarized telemetry data for a single system process.
 type ProcessInfo struct {
@@ -74,6 +92,10 @@ type SysStats struct {
 	Battery      BatteryInfo
 	GPU          GPUInfo
 	LocalIP      string
+	SelectedDisk string
+	AllDisks     []string
+	SelectedNet  string
+	AllNet       []string
 }
 
 // StatsManager handles the collection and caching of system telemetry.
@@ -115,13 +137,41 @@ func NewStatsManager() *StatsManager {
 }
 
 // GetStats collects current system metrics and process telemetry.
-func (sm *StatsManager) GetStats() SysStats {
+// priorityPIDs are PIDs that should be polled every tick (e.g., currently visible in UI).
+func (sm *StatsManager) GetStats(priorityPIDs []string, cfg Config) SysStats {
 	sm.tickCount++
 	stats := SysStats{
-		Disk:      sm.lastDisk,
-		DiskUsed:  sm.lastDiskUsed,
-		DiskTotal: sm.lastDiskTotal,
-		Uptime:    sm.lastUptime,
+		Disk:         sm.lastDisk,
+		DiskUsed:     sm.lastDiskUsed,
+		DiskTotal:    sm.lastDiskTotal,
+		Uptime:       sm.lastUptime,
+		SelectedDisk: cfg.SelectedDisk,
+		SelectedNet:  cfg.SelectedNetInt,
+	}
+
+	// Inventory Disks
+	if parts, err := disk.Partitions(false); err == nil {
+		for _, p := range parts {
+			if p.Mountpoint != "" {
+				stats.AllDisks = append(stats.AllDisks, p.Mountpoint)
+			}
+		}
+	}
+	if stats.SelectedDisk == "" && len(stats.AllDisks) > 0 {
+		stats.SelectedDisk = stats.AllDisks[0]
+	}
+
+	// Inventory Net
+	if interfaces, err := net.Interfaces(); err == nil {
+		for _, i := range interfaces {
+			// Only include interfaces that have an IP address and are not loopback
+			if len(i.Addrs) > 0 && !strings.Contains(i.Name, "Loopback") {
+				stats.AllNet = append(stats.AllNet, i.Name)
+			}
+		}
+	}
+	if stats.SelectedNet == "" && len(stats.AllNet) > 0 {
+		stats.SelectedNet = stats.AllNet[0]
 	}
 	if stats.Uptime == "" {
 		stats.Uptime = "0d 0h 0m"
@@ -167,20 +217,14 @@ func (sm *StatsManager) GetStats() SysStats {
 		}
 	}
 
-	// Battery via PowerShell (Robust for Windows)
-	batOut, _ := ExecuteCommand("Get-CimInstance -ClassName Win32_Battery | Select-Object EstimatedChargeRemaining, BatteryStatus | ConvertTo-Json")
-	if strings.Contains(batOut, "EstimatedChargeRemaining") {
-		var b struct {
-			EstimatedChargeRemaining int
-			BatteryStatus            int
-		}
-		if json.Unmarshal([]byte(batOut), &b) == nil {
-			stats.Battery.Percent = float64(b.EstimatedChargeRemaining)
-			statusMap := map[int]string{1: "Discharging", 2: "AC Power", 3: "Fully Charged", 6: "Charging"}
-			stats.Battery.Status = statusMap[b.BatteryStatus]
-			if stats.Battery.Status == "" {
-				stats.Battery.Status = "Unknown"
-			}
+	// Battery via WMI
+	var dstBat []Win32_Battery
+	if err := wmi.Query("SELECT EstimatedChargeRemaining, BatteryStatus FROM Win32_Battery", &dstBat); err == nil && len(dstBat) > 0 {
+		stats.Battery.Percent = float64(dstBat[0].EstimatedChargeRemaining)
+		statusMap := map[uint16]string{1: "Discharging", 2: "AC Power", 3: "Fully Charged", 6: "Charging"}
+		stats.Battery.Status = statusMap[dstBat[0].BatteryStatus]
+		if stats.Battery.Status == "" {
+			stats.Battery.Status = "Unknown"
 		}
 	}
 
@@ -194,7 +238,8 @@ func (sm *StatsManager) GetStats() SysStats {
 
 	now := time.Now()
 	if sm.tickCount%10 == 0 || sm.lastRefresh.IsZero() {
-		targetDisk := "C:"
+		targetDisk := stats.SelectedDisk
+		if targetDisk == "" { targetDisk = "C:" }
 		d, err := disk.Usage(targetDisk)
 		if err != nil {
 			targetDisk = "/"
@@ -237,12 +282,13 @@ func (sm *StatsManager) GetStats() SysStats {
 	}
 
 	if sm.tickCount%10 == 0 || sm.lastPing == 0 {
-		// Quick ping to Google DNS
-		pOut, _ := ExecuteCommand("Test-Connection 8.8.8.8 -Count 1 -Quiet; (Test-Connection 8.8.8.8 -Count 1).ResponseTime")
-		lines := strings.Split(strings.TrimSpace(pOut), "\n")
-		if len(lines) >= 2 && strings.Contains(lines[0], "True") {
-			stats.NetPing = ParseInt(lines[1])
+		// Quick TCP ping to Google DNS
+		startPing := time.Now()
+		conn, err := stdnet.DialTimeout("tcp", "8.8.8.8:53", 1*time.Second)
+		if err == nil && conn != nil {
+			stats.NetPing = int(time.Since(startPing).Milliseconds())
 			sm.lastPing = stats.NetPing
+			conn.Close()
 		} else {
 			stats.NetPing = sm.lastPing
 		}
@@ -250,18 +296,28 @@ func (sm *StatsManager) GetStats() SysStats {
 		stats.NetPing = sm.lastPing
 	}
 
-	if io, err := net.IOCounters(false); err == nil && len(io) > 0 {
+	if io, err := net.IOCounters(true); err == nil && len(io) > 0 {
+		var selectedIO *net.IOCountersStat
+		for _, ni := range io {
+			if ni.Name == stats.SelectedNet {
+				selectedIO = &ni
+				break
+			}
+		}
+		// Fallback to first if selected not found
+		if selectedIO == nil { selectedIO = &io[0] }
+
 		if !sm.lastNetTime.IsZero() {
 			dur := now.Sub(sm.lastNetTime).Seconds()
 			if dur > 0 {
-				stats.NetSent = float64(io[0].BytesSent-sm.lastNetSent) / 1024 / dur
-				stats.NetRecv = float64(io[0].BytesRecv-sm.lastNetRecv) / 1024 / dur
+				stats.NetSent = float64(selectedIO.BytesSent-sm.lastNetSent) / 1024 / dur
+				stats.NetRecv = float64(selectedIO.BytesRecv-sm.lastNetRecv) / 1024 / dur
 			}
 		}
-		stats.TotalNetSent = float64(io[0].BytesSent) / 1024 / 1024 / 1024 // GB
-		stats.TotalNetRecv = float64(io[0].BytesRecv) / 1024 / 1024 / 1024 // GB
-		sm.lastNetSent = io[0].BytesSent
-		sm.lastNetRecv = io[0].BytesRecv
+		stats.TotalNetSent = float64(selectedIO.BytesSent) / 1024 / 1024 / 1024 // GB
+		stats.TotalNetRecv = float64(selectedIO.BytesRecv) / 1024 / 1024 / 1024 // GB
+		sm.lastNetSent = selectedIO.BytesSent
+		sm.lastNetRecv = selectedIO.BytesRecv
 		sm.lastNetTime = now
 	}
 
@@ -287,6 +343,15 @@ func (sm *StatsManager) GetStats() SysStats {
 		}
 	}
 	sm.cacheMutex.Unlock()
+	
+	// Convert priorityPIDs to a map for O(1) lookup
+	priorityMap := make(map[int32]bool)
+	for _, pStr := range priorityPIDs {
+		var pID int32
+		if _, err := fmt.Sscanf(pStr, "%d", &pID); err == nil {
+			priorityMap[pID] = true
+		}
+	}
 
 	results := make(chan ProcessInfo, len(pids))
 	var wg sync.WaitGroup
@@ -325,23 +390,37 @@ func (sm *StatsManager) GetStats() SysStats {
 				sm.cacheMutex.Unlock()
 			}
 
-			shouldPoll := lastCPU > 0.5 || sm.tickCount%5 == 0 || lastMEM == ""
+			// OPTIMIZATION: Throttled Polling Logic
+			// 1. Priority PIDs (visible) poll every tick.
+			// 2. Active processes (CPU > 1%) poll every 2 ticks.
+			// 3. New processes (no lastMEM) poll once immediately.
+			// 4. Others poll every 10 ticks.
+			isPriority := priorityMap[pID]
+			isActive := lastCPU > 1.0
+			isNew := lastMEM == ""
+			
+			shouldPollCPU := isPriority || isNew || (isActive && sm.tickCount%2 == 0) || sm.tickCount%10 == 0
+			shouldPollMem := isPriority || isNew || sm.tickCount%20 == 0 || (isActive && sm.tickCount%5 == 0)
+			
 			cpuVal := lastCPU
 			memVal := lastMEM
 
-			if shouldPoll {
+			if shouldPollCPU {
 				c, _ := p.CPUPercent()
 				cpuVal = c
-
-				if sm.tickCount%10 == 0 || lastMEM == "" || cpuVal > 1.0 {
-					m, _ := p.MemoryInfo()
-					if m != nil {
-						memVal = fmt.Sprintf("%.1fMB", float64(m.RSS)/1024/1024)
-					}
-				}
-
+				
 				sm.cacheMutex.Lock()
 				sm.cpuCache[pID] = cpuVal
+				sm.cacheMutex.Unlock()
+			}
+			
+			if shouldPollMem {
+				m, _ := p.MemoryInfo()
+				if m != nil {
+					memVal = fmt.Sprintf("%.1fMB", float64(m.RSS)/1024/1024)
+				}
+				
+				sm.cacheMutex.Lock()
 				sm.memCache[pID] = memVal
 				sm.cacheMutex.Unlock()
 			}
@@ -389,53 +468,60 @@ func RandomInt(n int) int {
 	return rand.Intn(n)
 }
 
-// collectGPU queries nvidia-smi for NVIDIA GPU telemetry.
-// Returns an empty GPUInfo{Available:false} when nvidia-smi is absent or fails.
+// collectGPU queries NVIDIA via nvidia-smi with fallback to WMI for AMD/Intel.
 func collectGPU() GPUInfo {
+	// 1. Try NVIDIA-SMI
 	out, err := ExecuteCommand(
 		`nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw --format=csv,noheader,nounits`,
 	)
-	if err != nil || strings.TrimSpace(out) == "" {
-		return GPUInfo{}
+	if err == nil && strings.TrimSpace(out) != "" {
+		fields := strings.Split(strings.TrimSpace(out), ",")
+		if len(fields) >= 6 {
+			var util, vramUsed, vramTotal, temp, power float64
+			fmt.Sscanf(strings.TrimSpace(fields[1]), "%f", &util)
+			fmt.Sscanf(strings.TrimSpace(fields[2]), "%f", &vramUsed)
+			fmt.Sscanf(strings.TrimSpace(fields[3]), "%f", &vramTotal)
+			fmt.Sscanf(strings.TrimSpace(fields[4]), "%f", &temp)
+			fmt.Sscanf(strings.TrimSpace(fields[5]), "%f", &power)
+			return GPUInfo{
+				Name:        strings.TrimSpace(fields[0]),
+				Utilization: util,
+				VRAMUsed:    vramUsed,
+				VRAMTotal:   vramTotal,
+				Temp:        temp,
+				Power:       power,
+				Available:   true,
+			}
+		}
 	}
-	fields := strings.Split(strings.TrimSpace(out), ",")
-	if len(fields) < 6 {
-		return GPUInfo{}
+
+	// 2. Fallback to WMI for generic GPU info (AMD/Intel)
+	var dst []Win32_VideoController
+	err = wmi.Query("SELECT Name, AdapterRAM FROM Win32_VideoController", &dst)
+	if err == nil && len(dst) > 0 {
+		return GPUInfo{
+			Name:      dst[0].Name,
+			VRAMTotal: float64(dst[0].AdapterRAM) / 1024 / 1024,
+			Available: true,
+		}
 	}
-	var util, vramUsed, vramTotal, temp, power float64
-	fmt.Sscanf(strings.TrimSpace(fields[1]), "%f", &util)
-	fmt.Sscanf(strings.TrimSpace(fields[2]), "%f", &vramUsed)
-	fmt.Sscanf(strings.TrimSpace(fields[3]), "%f", &vramTotal)
-	fmt.Sscanf(strings.TrimSpace(fields[4]), "%f", &temp)
-	fmt.Sscanf(strings.TrimSpace(fields[5]), "%f", &power)
-	return GPUInfo{
-		Name:        strings.TrimSpace(fields[0]),
-		Utilization: util,
-		VRAMUsed:    vramUsed,
-		VRAMTotal:   vramTotal,
-		Temp:        temp,
-		Power:       power,
-		Available:   true,
-	}
+
+	return GPUInfo{}
 }
 
-// collectCPUTemps queries WMI for CPU package temperatures via PowerShell.
+// collectCPUTemps queries WMI for CPU package temperatures directly.
 // On systems where WMI thermal sensors are unavailable it returns nil.
 func collectCPUTemps() []float64 {
-	out, err := ExecuteCommand(
-		`(Get-CimInstance -Namespace root/WMI -ClassName MSAcpi_ThermalZoneTemperature).CurrentTemperature | ForEach-Object { [math]::Round(($_ - 2732) / 10.0, 1) }`,
-	)
-	if err != nil || strings.TrimSpace(out) == "" {
+	var dstTemp []MSAcpi_ThermalZoneTemperature
+	err := wmi.QueryNamespace("SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature", &dstTemp, "root\\WMI")
+	if err != nil || len(dstTemp) == 0 {
 		return nil
 	}
 	var temps []float64
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var t float64
-		if _, err := fmt.Sscanf(line, "%f", &t); err == nil && t > 0 && t < 120 {
+	for _, tz := range dstTemp {
+		// Convert from 10ths of degrees Kelvin to Celsius
+		t := (float64(tz.CurrentTemperature) - 2732.0) / 10.0
+		if t > 0 && t < 120 {
 			temps = append(temps, t)
 		}
 	}

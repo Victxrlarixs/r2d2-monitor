@@ -11,6 +11,13 @@ import (
 	"github.com/victx/r2d2-monitor/r2d2"
 )
 
+type FocusMode int
+const (
+	FocusProcs FocusMode = iota
+	FocusDisk
+	FocusNet
+)
+
 type MonitorModel struct {
 	Stats           r2d2.SysStats
 	Config          r2d2.Config
@@ -23,6 +30,7 @@ type MonitorModel struct {
 	SearchQuery     string
 	Sorting         string // "cpu", "mem"
 	Inspecting      bool
+	ConfirmKill     bool
 	CurrentFace     string
 	IsBlinking      bool
 	DisplayMsg      string
@@ -34,6 +42,7 @@ type MonitorModel struct {
 	
 	// Layout preset system
 	PresetController *PresetController
+	Focus            FocusMode
 }
 
 func InitialMonitor(sm *r2d2.StatsManager, cfg r2d2.Config) MonitorModel {
@@ -108,7 +117,7 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentFace == "idle" && !m.SearchMode && !m.Inspecting { m.setReaction("idle", 0) }
 		cmds = append(cmds, m.idleMsgCmd())
 	case r2d2.TickMsg:
-		cmds = append(cmds, r2d2.GetStatsCmd(m.SM), r2d2.Tick())
+		cmds = append(cmds, r2d2.GetStatsCmd(m.SM, m.getVisiblePIDs(), m.Config), r2d2.Tick())
 		if m.Inspecting {
 			cmds = append(cmds, r2d2.ScanProcessCmd(m.SelectedProcess.ID))
 		}
@@ -122,6 +131,21 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case r2d2.ScanResultMsg:
 		m.Details = string(msg)
 	case tea.KeyMsg:
+		if m.ConfirmKill {
+			switch msg.String() {
+			case "y", "Y":
+				entries := m.visibleEntries()
+				if m.Cursor < len(entries) {
+					m.setReaction("alarm", time.Second*4)
+					r2d2.KillProcess(entries[m.Cursor].ID)
+				}
+				m.ConfirmKill = false
+			default:
+				m.ConfirmKill = false
+				m.setReaction("idle", 0)
+			}
+			return m, nil
+		}
 		if m.SearchMode {
 			if key.Matches(msg, DefaultKeyMap.Quit) { 
 				m.SearchMode, m.SearchQuery = false, ""
@@ -147,8 +171,25 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, DefaultKeyMap.Quit):
 			if m.Inspecting { m.Inspecting = false ; m.setReaction("idle", 0) ; return m, nil }
 			return m, tea.Quit
-		case key.Matches(msg, DefaultKeyMap.Up): if m.Cursor > 0 { m.Cursor-- }
-		case key.Matches(msg, DefaultKeyMap.Down): if m.Cursor < len(m.visibleEntries())-1 { m.Cursor++ }
+		case key.Matches(msg, DefaultKeyMap.Up): 
+			if m.Focus == FocusProcs {
+				if m.Cursor > 0 { m.Cursor-- }
+			} else if m.Focus == FocusDisk {
+				m.cycleDisk(-1)
+			} else if m.Focus == FocusNet {
+				m.cycleNet(-1)
+			}
+		case key.Matches(msg, DefaultKeyMap.Down): 
+			if m.Focus == FocusProcs {
+				if m.Cursor < len(m.visibleEntries())-1 { m.Cursor++ }
+			} else if m.Focus == FocusDisk {
+				m.cycleDisk(1)
+			} else if m.Focus == FocusNet {
+				m.cycleNet(1)
+			}
+		case key.Matches(msg, DefaultKeyMap.Tab):
+			m.Focus = (m.Focus + 1) % 3
+			m.setReaction("thinking", time.Second)
 		case msg.Type == tea.KeyEnter:
 			m.Inspecting = !m.Inspecting
 			if m.Inspecting {
@@ -199,8 +240,8 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, DefaultKeyMap.Kill):
 			entries := m.visibleEntries()
 			if m.Cursor < len(entries) {
+				m.ConfirmKill = true
 				m.setReaction("alarm", time.Second*4)
-				r2d2.KillProcess(entries[m.Cursor].ID)
 			}
 		}
 	}
@@ -304,7 +345,22 @@ func (m MonitorModel) renderProcBox(w, h int, theme Theme) string {
 	listH := h - 4
 	var infoPanel string
 
-	if m.SearchMode {
+	if m.ConfirmKill {
+		entries := m.visibleEntries()
+		procName := "Unknown"
+		if m.Cursor < len(entries) {
+			procName = entries[m.Cursor].Name
+		}
+		confirmBox := lipgloss.NewStyle().
+			Background(lipgloss.Color("#FF1744")).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Bold(true).
+			Padding(0, 1).
+			Width(w - 4).
+			Render(fmt.Sprintf(" WARNING: Kill process %s? (y/N) ", truncate(procName, w-40)))
+		infoPanel = confirmBox + "\n"
+		listH -= 2
+	} else if m.SearchMode {
 		searchBox := lipgloss.NewStyle().
 			Background(lipgloss.Color("#161B22")).
 			Foreground(theme.CPU).
@@ -354,7 +410,11 @@ func (m MonitorModel) renderProcBox(w, h int, theme Theme) string {
 		}
 	}
 	content := infoPanel + header + "\n" + strings.Repeat("-", w-4) + "\n" + rows.String()
-	return RenderBox(w, h, " PROCESSES ", content, theme.CPU)
+	title := " PROCESSES "
+	if m.Focus == FocusProcs {
+		title = " > PROCESSES "
+	}
+	return RenderBox(w, h, title, content, theme.CPU)
 }
 
 func (m MonitorModel) visibleEntries() []r2d2.ProcessInfo {
@@ -369,6 +429,49 @@ func (m MonitorModel) visibleEntries() []r2d2.ProcessInfo {
 	return filtered
 }
 
+func (m MonitorModel) getVisiblePIDs() []string {
+	filtered := m.visibleEntries()
+	if len(filtered) == 0 { return nil }
+	
+	// Estimate list height (roughly) or just take a safe window around cursor
+	// Since we don't know the exact listH here without re-calculating everything,
+	// we'll just take the 40 processes around the cursor as "visible".
+	start := m.Cursor - 20
+	if start < 0 { start = 0 }
+	end := start + 40
+	if end > len(filtered) { end = len(filtered) }
+	
+	var pids []string
+	for i := start; i < end; i++ {
+		pids = append(pids, filtered[i].ID)
+	}
+	return pids
+}
+
+func (m *MonitorModel) cycleDisk(delta int) {
+	if len(m.Stats.AllDisks) == 0 { return }
+	idx := -1
+	for i, d := range m.Stats.AllDisks {
+		if d == m.Stats.SelectedDisk { idx = i; break }
+	}
+	if idx == -1 { idx = 0 }
+	idx = (idx + delta + len(m.Stats.AllDisks)) % len(m.Stats.AllDisks)
+	m.Config.SelectedDisk = m.Stats.AllDisks[idx]
+	r2d2.SaveConfig(m.Config)
+}
+
+func (m *MonitorModel) cycleNet(delta int) {
+	if len(m.Stats.AllNet) == 0 { return }
+	idx := -1
+	for i, n := range m.Stats.AllNet {
+		if n == m.Stats.SelectedNet { idx = i; break }
+	}
+	if idx == -1 { idx = 0 }
+	idx = (idx + delta + len(m.Stats.AllNet)) % len(m.Stats.AllNet)
+	m.Config.SelectedNetInt = m.Stats.AllNet[idx]
+	r2d2.SaveConfig(m.Config)
+}
+
 func truncate(s string, l int) string {
 	if lipgloss.Width(s) <= l { return s }
 	if l < 3 { return s[:l] }
@@ -376,7 +479,7 @@ func truncate(s string, l int) string {
 }
 
 type KeyMap struct {
-	Up, Down, Quit, Theme, Search, Kill, SortCPU, SortMem, Preset key.Binding
+	Up, Down, Quit, Theme, Search, Kill, SortCPU, SortMem, Preset, Tab key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
@@ -389,4 +492,5 @@ var DefaultKeyMap = KeyMap{
 	SortCPU: key.NewBinding(key.WithKeys("f1")),
 	SortMem: key.NewBinding(key.WithKeys("f2")),
 	Preset:  key.NewBinding(key.WithKeys("p")),
+	Tab:     key.NewBinding(key.WithKeys("tab")),
 }

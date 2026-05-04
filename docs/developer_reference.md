@@ -26,9 +26,14 @@ This document provides internal details for developers looking to extend or cont
 ## Key Modules
 
 ### `StatsManager`
-- **Optimization**: Uses a `tickCount` system to refresh expensive metrics (like Disk or Uptime) less frequently than volatile ones (CPU).
+- **Optimization**: Implements a prioritized polling strategy. Visible/active processes are updated frequently, while idle processes are throttled to minimize overhead. Expensive metrics (like Disk or Uptime) use a `tickCount` system for infrequent refreshes.
 - **Concurrency**: Parallelizes process polling using a worker pool (goroutines + semaphores) to ensure the UI remains smooth even with 200+ processes.
-- **Robust Parsing**: Implements a dedicated `ParseInt` utility for reliable extraction of numeric data from noisy WMI/PowerShell stdout.
+- **Robust Parsing**: Implements native WMI struct mapping for reliable data extraction, reducing reliance on external subprocesses.
+
+### `Focus & Hardware Cycling`
+- Implements a `FocusMode` system (`Procs`, `Disk`, `Net`) toggled by the `TAB` key.
+- Hardware selection (Disk/Net) is persisted in `r2d2.Config`.
+- `cycleDisk` and `cycleNet` helpers handle the index rotation and config saving.
 
 ### `Responsive Layout`
 - The `View()` function in `monitor.go` calculates `topH` (header height) dynamically.

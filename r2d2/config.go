@@ -10,7 +10,9 @@ import (
 type Config struct {
 	ThemeIdx     int    `json:"theme_idx"`
 	SortBy       string `json:"sort_by"`
-	LayoutPreset int    `json:"layout_preset"` // 0=full 1=compact 2=cpu-focus 3=proc-only
+	LayoutPreset     int    `json:"layout_preset"` // 0=full 1=compact 2=cpu-focus 3=proc-only
+	SelectedDisk     string `json:"selected_disk"`
+	SelectedNetInt   string `json:"selected_net_int"`
 }
 
 // DefaultConfig returns the standard settings for a fresh install.
@@ -19,14 +21,15 @@ func DefaultConfig() Config {
 		ThemeIdx:     0,
 		SortBy:       "CPU",
 		LayoutPreset: 0,
+		SelectedDisk: "",
+		SelectedNetInt: "",
 	}
 }
 
-// GetConfigPath returns the OS-specific path for the configuration file.
+// GetConfigPath returns the path for the configuration file in the same directory as the executable.
 func GetConfigPath() string {
-	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, ".r2d2-monitor")
-	_ = os.MkdirAll(dir, 0755)
+	exePath, _ := os.Executable()
+	dir := filepath.Dir(exePath)
 	return filepath.Join(dir, "config.json")
 }
 

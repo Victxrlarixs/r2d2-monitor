@@ -24,9 +24,9 @@ func Tick() tea.Cmd {
 
 // GetStatsCmd creates a command that fetches system stats using the provided manager.
 // The manager is created once in main and passed through the UI model — no global state.
-func GetStatsCmd(sm *StatsManager) tea.Cmd {
+func GetStatsCmd(sm *StatsManager, priorityPIDs []string, cfg Config) tea.Cmd {
 	return func() tea.Msg {
-		return StatsMsg(sm.GetStats())
+		return StatsMsg(sm.GetStats(priorityPIDs, cfg))
 	}
 }
 

@@ -8,13 +8,14 @@ import (
 
 var fileLogger *log.Logger
 
-// InitLogger initializes a file-based logger for background auditing.
+// InitLogger initializes a file-based logger in a 'logs' directory next to the executable.
 func InitLogger() {
-	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, ".r2d2-monitor")
-	_ = os.MkdirAll(dir, 0755)
+	exePath, _ := os.Executable()
+	dir := filepath.Dir(exePath)
+	logDir := filepath.Join(dir, "logs")
+	_ = os.MkdirAll(logDir, 0755)
 	
-	logPath := filepath.Join(dir, "r2d2.log")
+	logPath := filepath.Join(logDir, "r2d2.log")
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return

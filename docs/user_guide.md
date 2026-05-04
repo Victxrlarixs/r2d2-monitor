@@ -10,32 +10,29 @@ Simply run `r2d2-monitor.exe`. R2-D2 will automatically launch in a dedicated te
 
 | Key | Action | Description |
 | :--- | :--- | :--- |
-| `↑` / `↓` | **Navigate** | Move the cursor through the active process list. |
+| `TAB` | **Switch Focus** | Toggle focus between Processes, Disks, and Network panels. |
+| `↑` / `↓` | **Navigate/Cycle** | Move the cursor (Processes) or cycle hardware (Disks/Net). |
 | `ENTER` | **Deep Scan** | Open a detailed inspection window for the selected process. |
 | `ESC` | **Back/Close** | Close the scan view or exit search mode. |
 | `F1` | **Sort by CPU** | Prioritize the list by processor usage. |
 | `F2` | **Sort by RAM** | Prioritize the list by memory footprint. |
 | `F3` | **Change Theme** | Cycle through available visual styles (Amber, Matrix, etc.). |
-| `P` | **Change Layout** | Cycle through layout presets (FULL, COMPACT, NET-FOCUS, CPU-ONLY). |
+| `P` | **Change Layout** | Cycle through layout presets. |
 | `/` | **Search** | Filter the process list by name. |
-| `F9` | **ZAP (Kill)** | Forcefully terminate the selected process and its children. |
+| `F9` | **ZAP (Kill)** | Request process termination. Requires `Y` to confirm. |
 | `Q` / `Ctrl+C` | **Quit** | Shut down R2-D2 and exit the console. |
 
 ---
 
-## New in Ultra-Reloaded
+## New & Optimized Features
 
-- **NET & IO Panel**: Real-time network latency (Ping), session traffic (GB), and Disk Read/Write speeds (KB/s).
+- **Hardware Browser**: Press `TAB` to focus the Disk or Network panels, then use `↑/↓` to cycle through available drives and adapters.
+- **Safe Termination**: Killing a process with `F9` now requires a `Y` confirmation to prevent accidental shutdowns.
+- **Native Telemetry**: Replaced heavy sub-processes with native WMI/Go calls for Battery, Temperatures, and Network Ping.
+- **Multi-Vendor GPU**: Detailed support for NVIDIA (utilization, temp, power) with generic fallback for AMD/Intel.
+- **Throttled Polling**: Intelligent polling logic only performs "deep" queries on visible processes, drastically reducing monitor overhead.
 - **Braille Graphing**: High-resolution network activity graphs using Unicode Braille patterns.
-- **Btop-Style Inspection**: Press `ENTER` to view a detailed multi-column panel with Process IO, Status, Parent PID, and full CMD arguments.
-- **Layout Presets**: Press `P` to cycle through four optimized layouts:
-  - **FULL**: Complete interface with all panels visible
-  - **COMPACT**: No R2-D2 box, maximized process list space
-  - **NET-FOCUS**: Enlarged network panel for network monitoring
-  - **CPU-ONLY**: Minimal layout showing only CPU and processes
-- **Visible Search**: Press `/` to trigger an interactive search bar for process filtering.
-- **OS Identity**: Displays the native Windows platform name and version.
-- **Terminal Guard**: Automatic warning view if terminal resizes below 80x20.
+- **Portability**: All configuration and logs are stored next to the executable.
 
 ## Key Features
 
@@ -58,8 +55,9 @@ R2-D2 remembers your preferences! Your chosen **Theme**, **Sort Order**, and **L
 
 ## Configuration & Logs
 
-- **Config File**: `%USERPROFILE%\.r2d2-monitor\config.json`
-- **Audit Logs**: `%USERPROFILE%\.r2d2-monitor\r2d2.log`
+R2-D2 is now fully portable. All files are kept in the same directory as the executable:
+- **Config File**: `config.json`
+- **Audit Logs**: `logs/r2d2.log`
 
 *If you encounter a process that won't terminate or a scanning error, check the `r2d2.log` file for technical details.*
 
