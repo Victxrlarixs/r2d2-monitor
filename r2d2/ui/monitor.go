@@ -79,7 +79,7 @@ func (m MonitorModel) blinkCmd() tea.Cmd {
 }
 
 func (m MonitorModel) idleMsgCmd() tea.Cmd {
-	return tea.Tick(time.Second*8, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Second*4, func(t time.Time) tea.Msg {
 		return rotateIdleMsg{}
 	})
 }
@@ -118,6 +118,10 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.idleMsgCmd())
 	case r2d2.TickMsg:
 		cmds = append(cmds, r2d2.GetStatsCmd(m.SM, m.getVisiblePIDs(), m.Config), r2d2.Tick())
+		// SPONTANEITY: Randomly trigger thinking/scanning animations to feel "alive"
+		if !m.Inspecting && !m.ConfirmKill && m.CurrentFace == "idle" && r2d2.RandomInt(100) < 15 {
+			m.setReaction("thinking", time.Second*2)
+		}
 		if m.Inspecting {
 			cmds = append(cmds, r2d2.ScanProcessCmd(m.SelectedProcess.ID))
 		}
@@ -390,7 +394,7 @@ func (m MonitorModel) renderProcBox(w, h int, theme Theme) string {
 	}
 
 	cpuSort, memSort := "", ""
-	if m.Sorting == "cpu" { cpuSort = " V" } else { memSort = " V" }
+	if m.Sorting == "cpu" { cpuSort = " >" } else { memSort = " >" }
 	header := headerSt.Render(fmt.Sprintf("  %-7s %-*s %-8s %-10s", "PID", nameW, "NAME", "CPU%"+cpuSort, "MEM"+memSort))
 	
 	filtered := m.visibleEntries()

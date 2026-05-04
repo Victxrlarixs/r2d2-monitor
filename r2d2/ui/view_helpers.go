@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/victx/r2d2-monitor/r2d2"
 )
 
 // barColor returns a dynamic color based on usage level: green → amber → red.
@@ -73,7 +74,7 @@ func RenderBox(width, height int, title string, content string, color lipgloss.C
 	if len(boxLines) > 0 && title != "" {
 		tStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#000000")).Background(color).Bold(true).Padding(0, 1)
 		tText  := tStyle.Render(title)
-		pad    := (width - 2) - lipgloss.Width(tText) - 2
+		pad    := width - lipgloss.Width(tText) - 3
 		if pad < 0 { pad = 0 }
 		boxLines[0] = "╭─" + tText + strings.Repeat("─", pad) + "╮"
 	}
@@ -228,27 +229,37 @@ func (m MonitorModel) renderR2Box(w, h int, theme Theme) string {
 	dialSt    := lipgloss.NewStyle().Foreground(lipgloss.Color("#C9D1D9")).Italic(true)
 	prefixSt  := lipgloss.NewStyle().Foreground(artColor).Bold(true)
 
-	// Inner usable width for the art (box padding = 2 sides × 1)
-	artW := w - 4
-
-	var b strings.Builder
+	// Inner usable width for content (box padding = 2 sides × 1)
+	innerW := w - 4
+	
+	// 1. Prepare Art
+	var artLines []string
+	jitter := ""
+	if (m.CurrentFace == "thinking" || m.CurrentFace == "alarm" || m.CurrentFace == "scanning") && r2d2.RandomInt(100) < 50 {
+		jitter = " "
+	}
 	for _, line := range reaction.Art {
 		if m.IsBlinking { line = strings.ReplaceAll(line, "(O)", "(·)") }
-		// Pad or truncate art to exactly artW so it never clips
-		aw := lipgloss.Width(line)
-		if aw < artW {
-			line = line + strings.Repeat(" ", artW-aw)
-		} else if aw > artW {
-			line = truncate(line, artW)
-		}
-		b.WriteString(artSt.Render(line) + "\n")
+		artLines = append(artLines, artSt.Render(jitter+line))
 	}
+	artSide := strings.Join(artLines, "\n")
+	artWidth := lipgloss.Width(artLines[0])
 
-	// Dialogue on its own line below the art, full width
-	msg := prefixSt.Render("R2›") + " " + dialSt.Render(truncate(m.DisplayMsg, artW-4))
-	b.WriteString(msg + "\n")
+	// 2. Prepare Dialogue Side
+	maxDialW := innerW - artWidth - 4
+	if maxDialW < 10 { maxDialW = 10 }
+	
+	dialBox := lipgloss.NewStyle().
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder(), true).
+		BorderForeground(lipgloss.Color("#30363D")).
+		Width(maxDialW).
+		Render(prefixSt.Render("R2›") + "\n" + dialSt.Render(m.DisplayMsg))
 
-	return RenderBox(w, h, " ASTROMECH ", b.String(), theme.CharAccent)
+	// 3. Join horizontally
+	content := lipgloss.JoinHorizontal(lipgloss.Center, artSide, dialBox)
+
+	return RenderBox(w, h, " ASTROMECH ", content, theme.CharAccent)
 }
 
 // ── NET & IO ─────────────────────────────────────────────────────────────────

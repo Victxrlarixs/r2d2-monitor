@@ -30,6 +30,9 @@ var R2Reactions = map[string]Reaction{
 			"*Bleep* Scanning background tasks.",
 			"*Trill* Power levels within limits.",
 			"*Whistle* Keeping an eye on things.",
+			"*Bop bop* Logic buffers cleared.",
+			"*Ping* New metric acquired.",
+			"*Bweeee* Looking for subroutines.",
 		},
 	},
 	"thinking": {
@@ -52,6 +55,8 @@ var R2Reactions = map[string]Reaction{
 			"*Whirr* Calculating delta values.",
 			"*Bweep* Accessing kernel telemetry.",
 			"*Bloop* Optimizing refresh buffers.",
+			"*Zzt* Parsing WMI structures.",
+			"*Click-clack* Sorting process table.",
 		},
 	},
 	"scanning": {

@@ -130,7 +130,7 @@ func (lc *LayoutCalculator) Calculate(config *LayoutConfig, width, height int) *
 	dims := &PanelDimensions{}
 	
 	// Calculate basic layout structure
-	topH := 10
+	topH := 12
 	footerH := 1
 	availableH := height - topH - footerH
 	
