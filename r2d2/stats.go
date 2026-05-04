@@ -128,6 +128,7 @@ type StatsManager struct {
 
 // NewStatsManager initializes a new telemetry provider with empty caches.
 func NewStatsManager() *StatsManager {
+	LogInfo("Initializing StatsManager (Telemetry Engine)...")
 	return &StatsManager{
 		procCache: make(map[int32]*process.Process),
 		nameCache: make(map[int32]string),
@@ -183,11 +184,15 @@ func (sm *StatsManager) GetStats(priorityPIDs []string, cfg Config) SysStats {
 		stats.RAMTotal = float64(v.Total) / 1024 / 1024 / 1024
 		stats.RAMAvailable = float64(v.Available) / 1024 / 1024 / 1024
 		stats.RAMCached = float64(v.Cached) / 1024 / 1024 / 1024
+	} else if err != nil {
+		LogError(err, "Failed to collect VirtualMemory")
 	}
 	if s, err := mem.SwapMemory(); err == nil && s != nil {
 		stats.Swap = s.UsedPercent
 		stats.SwapUsed = float64(s.Used) / 1024 / 1024 / 1024
 		stats.SwapTotal = float64(s.Total) / 1024 / 1024 / 1024
+	} else if err != nil {
+		LogError(err, "Failed to collect SwapMemory")
 	}
 	if c, err := cpu.Percent(0, false); err == nil && len(c) > 0 {
 		stats.CPU = c[0]
@@ -504,6 +509,8 @@ func collectGPU() GPUInfo {
 			VRAMTotal: float64(dst[0].AdapterRAM) / 1024 / 1024,
 			Available: true,
 		}
+	} else if err != nil {
+		LogError(err, "WMI VideoController Query failed")
 	}
 
 	return GPUInfo{}
