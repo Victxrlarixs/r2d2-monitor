@@ -32,6 +32,7 @@ Simply run `r2d2-monitor-portable.exe`. R2-D2 will automatically launch in a ded
 - **Multi-Vendor GPU**: Detailed support for NVIDIA (utilization, temp, power) with generic fallback for AMD/Intel.
 - **Throttled Polling**: Intelligent polling logic only performs "deep" queries on visible processes, drastically reducing monitor overhead.
 - **Braille Graphing**: High-resolution network activity graphs using Unicode Braille patterns.
+- **Auto-Updates**: The monitor automatically checks for new versions on GitHub every time it starts. If a new version is found, it will update itself transparently.
 - **Portability**: All configuration and logs are stored next to the executable.
 
 ## Key Features

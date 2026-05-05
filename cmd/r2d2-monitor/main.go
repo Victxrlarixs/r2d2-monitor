@@ -29,6 +29,11 @@ var rootCmd = &cobra.Command{
 
 		// Initialize professional components
 		r2d2.InitLogger()
+		
+		// Check and apply updates transparently before loading the UI
+		r2d2.CleanupOldVersion()
+		r2d2.CheckAndApplyUpdate()
+
 		cfg := r2d2.LoadConfig()
 		sm := r2d2.NewStatsManager()
 

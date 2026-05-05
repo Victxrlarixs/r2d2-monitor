@@ -12,6 +12,8 @@ This document provides internal details for developers looking to extend or cont
 │   ├── executor.go        # Command execution (PS/WMI)
 │   ├── logger.go          # Background auditing
 │   ├── stats.go           # Telemetry & Polling logic
+│   ├── updater.go         # GitHub API Self-Updater
+│   ├── version.go         # Semantic versioning
 │   └── ui/                # UI Package (Bubble Tea)
 │       ├── components.go  # Reusable widgets (Bars, etc.)
 │       ├── monitor.go     # Main Model & TEA loop
@@ -34,6 +36,12 @@ This document provides internal details for developers looking to extend or cont
 - Implements a `FocusMode` system (`Procs`, `Disk`, `Net`) toggled by the `TAB` key.
 - Hardware selection (Disk/Net) is persisted in `r2d2.Config`.
 - `cycleDisk` and `cycleNet` helpers handle the index rotation and config saving.
+
+### `Versioning & Updates`
+- **Version**: Managed in `r2d2/version.go` as a variable.
+- **Automation**: The version string is automatically injected during the GitHub Actions build process using `-ldflags`.
+- **Workflow**: The `CheckAndApplyUpdate` function uses the GitHub API to find the latest release asset and compares it with the injected version.
+- **CI Integration**: Every push to `main` triggers an action that generates a new version based on the `github.run_number`.
 
 ### `Responsive Layout`
 - The `View()` function in `monitor.go` calculates `topH` (header height) dynamically.

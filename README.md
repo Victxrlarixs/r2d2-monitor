@@ -29,6 +29,8 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 - Hardware Browsing: Ability to cycle through different disk drives and network adapters for detailed monitoring.
 - Process Management: Integrated process list with search, deep scan, and safe termination with confirmation.
 - Performance Optimized: Throttled polling logic that prioritizes visible processes to ensure low overhead.
+- High-Res Graphing: Network activity visualization using Unicode Braille patterns.
+- Auto-Updates: Transparent version checking and self-updating via GitHub API.
 - Portability: Zero installation; configuration and logs are kept in the executable's directory.
 - Layout Presets: Four predefined layouts (FULL, COMPACT, NET-FOCUS, CPU-ONLY) optimized for different monitoring scenarios.
 - Responsive Design: Fluid layout that adapts to any terminal size automatically.
@@ -37,14 +39,14 @@ R2-D2 Monitor is a high-performance system telemetry console for Windows. It pro
 
 Using R2-D2 Monitor is as easy as:
 1. Go to the [Releases](https://github.com/Victxrlarixs/r2d2-monitor/releases) page.
-2. Download the latest `r2d2-monitor.exe`.
+2. Download the latest `r2d2-monitor-portable.exe`.
 3. Run it and enjoy! No installation or Go environment required.
 
 ## Usage
 
 Run the executable to start the monitor:
 ```bash
-./r2d2-monitor.exe
+./r2d2-monitor-portable.exe
 ```
 
 ### Basic Controls

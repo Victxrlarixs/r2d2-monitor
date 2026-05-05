@@ -12,6 +12,7 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
     *   `StatsManager`: Encapsulated telemetry provider using `gopsutil` and native WMI. Features a thread-safe cache and prioritized polling (High-priority for visible/active processes).
     *   `Executor`: abstraction layer for OS-level commands (Taskkill, PowerShell/WMI).
     *   `Config`: Persistence layer for user settings using JSON.
+    *   `Updater`: Self-updating module utilizing GitHub Releases API with atomic binary swapping.
     *   `Logger`: Asynchronous file-based logging for auditing system actions.
 3.  **UI (`r2d2/ui/`)**: 
     *   **The Elm Architecture (TEA)**: Predictable state management via `Model`, `Update`, and `View`.
@@ -27,7 +28,7 @@ The project follows a **SOLID-compliant, domain-driven architecture** to ensure 
 - **OS Integration**: Native WMI (via `yusufpapurcu/wmi`) / Taskkill / Standard TCP Ping
 
 ## Data Flow
-1.  **Init**: `main` loads config -> initializes `StatsManager` -> starts Bubble Tea loop.
+1.  **Init**: `main` loads logger -> triggers `CheckAndApplyUpdate` -> loads config -> initializes `StatsManager` -> starts Bubble Tea loop.
 2.  **Polling**: Every second, a background telemetry scan is triggered. The engine uses native WMI/Go calls for advanced metrics (Battery, Temperature, Latency) and utilizes a prioritized polling strategy to minimize CPU footprint.
 3.  **Update**: Metrics are processed, sorted, and stored in the `Model`.
 4.  **Render**: The `View` function calculates terminal dimensions and draws the interface using Lipgloss styles.

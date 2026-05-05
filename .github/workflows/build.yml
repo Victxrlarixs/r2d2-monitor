@@ -31,14 +31,14 @@ jobs:
 
     - name: Build Executable
       run: |
-        go build -v -o r2d2-monitor-portable.exe ./cmd/r2d2-monitor
+        go build -v -ldflags="-X 'github.com/victx/r2d2-monitor/r2d2.Version=v1.0.${{ github.run_number }}'" -o r2d2-monitor-portable.exe ./cmd/r2d2-monitor
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       with:
-        tag_name: v${{ github.run_number }}
-        name: R2-D2 Monitor
+        tag_name: v1.0.${{ github.run_number }}
+        name: R2-D2 Monitor v1.0.${{ github.run_number }}
         body: |
           Latest update:
           ${{ github.event.head_commit.message }}
