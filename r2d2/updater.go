@@ -16,7 +16,7 @@ const (
 	assetName = "r2d2-monitor-portable.exe"
 )
 
-type githubRelease struct {
+type GithubRelease struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
 		Name               string `json:"name"`
@@ -24,53 +24,19 @@ type githubRelease struct {
 	} `json:"assets"`
 }
 
-// CheckAndApplyUpdate checks for a new version on GitHub and applies it if found.
-// This is designed to be called at startup.
-func CheckAndApplyUpdate() {
-	LogInfo("Checking for updates...")
-	
-	latest, err := getLatestRelease()
-	if err != nil {
-		LogError(err, "Failed to check for updates")
-		return
-	}
-
-	// Compare versions (simple string compare for now, assuming vX.Y.Z format)
-	if latest.TagName == Version {
-		LogInfo("System is up to date.")
-		return
-	}
-
-	fmt.Printf("\n[R2-D2] *Whistle* New version found: %s (Current: %s)\n", latest.TagName, Version)
-	fmt.Println("[R2-D2] *Bleep bloop* Downloading update...")
-
-	var downloadURL string
-	for _, asset := range latest.Assets {
-		if asset.Name == assetName {
-			downloadURL = asset.BrowserDownloadURL
-			break
-		}
-	}
-
-	if downloadURL == "" {
-		LogInfo("No suitable asset found in latest release.")
-		return
-	}
-
-	if err := downloadAndReplace(downloadURL); err != nil {
-		LogError(err, "Failed to apply update")
-		fmt.Printf("[R2-D2] *Sad bloop* Update failed: %v\n", err)
-		return
-	}
-
-	fmt.Println("[R2-D2] *Joyful beep* Update complete! Restarting in 3 seconds...")
-	time.Sleep(time.Second * 3)
-	restartProcess()
+// UpdateState represents the current progress of a background update.
+type UpdateState struct {
+	Percentage float64
+	Status     string
+	Done       bool
+	Error      error
+	URL        string
 }
 
-func getLatestRelease() (*githubRelease, error) {
+// FetchLatestReleaseInfo checks GitHub for the latest release metadata.
+func FetchLatestReleaseInfo() (*GithubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
@@ -81,75 +47,96 @@ func getLatestRelease() (*githubRelease, error) {
 		return nil, fmt.Errorf("github api returned status %d", resp.StatusCode)
 	}
 
-	var release githubRelease
+	var release GithubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return nil, err
 	}
 	return &release, nil
 }
 
-func downloadAndReplace(url string) error {
+// DownloadWithProgress performs the download and calls progressCb with the percentage.
+func DownloadWithProgress(url string, progressCb func(UpdateState)) {
 	exePath, err := os.Executable()
 	if err != nil {
-		return err
+		progressCb(UpdateState{Error: err})
+		return
 	}
 
-	oldPath := exePath + ".old"
 	newPath := exePath + ".tmp"
-
-	// 1. Download to tmp
 	out, err := os.Create(newPath)
 	if err != nil {
-		return err
+		progressCb(UpdateState{Error: err})
+		return
 	}
 	defer out.Close()
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		progressCb(UpdateState{Error: err})
+		return
 	}
 	defer resp.Body.Close()
 
-	if _, err := io.Copy(out, resp.Body); err != nil {
-		return err
+	if resp.StatusCode != http.StatusOK {
+		progressCb(UpdateState{Error: fmt.Errorf("bad status: %s", resp.Status)})
+		return
 	}
+
+	size := resp.ContentLength
+	buffer := make([]byte, 32*1024)
+	var downloaded int64
+
+	for {
+		n, err := resp.Body.Read(buffer)
+		if n > 0 {
+			_, writeErr := out.Write(buffer[:n])
+			if writeErr != nil {
+				progressCb(UpdateState{Error: writeErr})
+				return
+			}
+			downloaded += int64(n)
+			if size > 0 {
+				progressCb(UpdateState{
+					Percentage: float64(downloaded) / float64(size),
+					Status:     fmt.Sprintf("Downloading: %.0f%%", (float64(downloaded)/float64(size))*100),
+				})
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			progressCb(UpdateState{Error: err})
+			return
+		}
+	}
+
 	out.Close()
-
-	// 2. Cleanup old if exists
+	
+	// Atomic Swap
+	oldPath := exePath + ".old"
 	_ = os.Remove(oldPath)
-
-	// 3. Rename current to .old
-	// On Windows, you can rename a running executable!
 	if err := os.Rename(exePath, oldPath); err != nil {
-		return err
+		progressCb(UpdateState{Error: err})
+		return
 	}
-
-	// 4. Rename tmp to current
 	if err := os.Rename(newPath, exePath); err != nil {
-		// Rollback if failed
 		_ = os.Rename(oldPath, exePath)
-		return err
+		progressCb(UpdateState{Error: err})
+		return
 	}
 
-	return nil
+	progressCb(UpdateState{Done: true, Status: "Update complete! Restarting..."})
 }
 
-func restartProcess() {
+// RestartApp triggers a self-restart.
+func RestartApp() {
 	exePath, _ := os.Executable()
-	
-	// Start the new process
 	cmd := exec.Command(exePath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
-	err := cmd.Start()
-	if err != nil {
-		fmt.Printf("Error restarting: %v\n", err)
-		os.Exit(1)
-	}
-	
-	// Exit the current process
+	_ = cmd.Start()
 	os.Exit(0)
 }
 
@@ -161,4 +148,9 @@ func CleanupOldVersion() {
 		_ = os.Remove(oldPath)
 		LogInfo("Cleaned up old version binary.")
 	}
+}
+
+// Legacy function for backward compatibility if needed, though we will use the new async flow.
+func CheckAndApplyUpdate() {
+	// (Keeping signature but it will be unused in the new TUI flow)
 }

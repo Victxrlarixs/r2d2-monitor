@@ -249,12 +249,25 @@ func (m MonitorModel) renderR2Box(w, h int, theme Theme) string {
 	maxDialW := innerW - artWidth - 4
 	if maxDialW < 10 { maxDialW = 10 }
 	
+	dialBoxContent := prefixSt.Render("R2›") + "\n" + dialSt.Render(m.DisplayMsg)
+	if m.Updating {
+		barW := maxDialW - 4
+		if barW < 5 { barW = 5 }
+		filled := int(float64(barW) * m.UpdateState.Percentage)
+		if filled > barW { filled = barW }
+		if filled < 0 { filled = 0 }
+		bar := lipgloss.NewStyle().Foreground(theme.CPU).Render(strings.Repeat("█", filled)) + 
+		       lipgloss.NewStyle().Foreground(lipgloss.Color("#30363D")).Render(strings.Repeat("░", barW-filled))
+		
+		dialBoxContent = prefixSt.Render("R2›") + "\n" + dialSt.Render(m.UpdateState.Status) + "\n\n" + bar
+	}
+	
 	dialBox := lipgloss.NewStyle().
 		Padding(1, 2).
 		Border(lipgloss.RoundedBorder(), true).
 		BorderForeground(lipgloss.Color("#30363D")).
 		Width(maxDialW).
-		Render(prefixSt.Render("R2›") + "\n" + dialSt.Render(m.DisplayMsg))
+		Render(dialBoxContent)
 
 	// 3. Join horizontally
 	content := lipgloss.JoinHorizontal(lipgloss.Center, artSide, dialBox)

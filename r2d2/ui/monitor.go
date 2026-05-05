@@ -43,6 +43,10 @@ type MonitorModel struct {
 	// Layout preset system
 	PresetController *PresetController
 	Focus            FocusMode
+
+	// Updater state
+	Updating      bool
+	UpdateState   r2d2.UpdateState
 }
 
 func InitialMonitor(sm *r2d2.StatsManager, cfg r2d2.Config) MonitorModel {
@@ -58,7 +62,12 @@ func InitialMonitor(sm *r2d2.StatsManager, cfg r2d2.Config) MonitorModel {
 }
 
 func (m MonitorModel) Init() tea.Cmd {
-	return tea.Batch(r2d2.Tick(), m.blinkCmd(), m.idleMsgCmd())
+	return tea.Batch(
+		r2d2.Tick(), 
+		m.blinkCmd(), 
+		m.idleMsgCmd(),
+		m.checkUpdateCmd(),
+	)
 }
 
 func (m *MonitorModel) setReaction(face string, lockDuration time.Duration) {
@@ -88,6 +97,30 @@ type blinkMsg struct{}
 type rotateIdleMsg struct{}
 type endBlinkMsg struct{}
 
+type UpdateCheckMsg struct {
+	Release *r2d2.GithubRelease
+	Error   error
+}
+
+type UpdateProgressMsg struct {
+	State r2d2.UpdateState
+	Sub   chan UpdateProgressMsg
+}
+
+func (m MonitorModel) checkUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		rel, err := r2d2.FetchLatestReleaseInfo()
+		return UpdateCheckMsg{Release: rel, Error: err}
+	}
+}
+
+func listenForUpdate(sub chan UpdateProgressMsg) tea.Cmd {
+	return func() tea.Msg {
+		s := <-sub
+		return UpdateProgressMsg{State: s.State, Sub: sub}
+	}
+}
+
 func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -104,7 +137,54 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentFace != "alarm" { m.setReaction("alarm", time.Second*5) }
 	}
 
+	if m.Stats.CPU > 90 || m.Stats.RAM > 90 {
+		if m.CurrentFace != "alarm" { m.setReaction("alarm", time.Second*5) }
+	}
+
 	switch msg := msg.(type) {
+	case UpdateCheckMsg:
+		if msg.Error != nil {
+			r2d2.LogError(msg.Error, "Update check failed")
+			return m, nil
+		}
+		if msg.Release != nil && msg.Release.TagName != r2d2.Version {
+			m.Updating = true
+			m.UpdateState.Status = "New version found: " + msg.Release.TagName
+			m.setReaction("thinking", 0)
+			
+			// Find asset
+			var downloadURL string
+			for _, a := range msg.Release.Assets {
+				if strings.Contains(a.Name, "portable.exe") {
+					downloadURL = a.BrowserDownloadURL
+					break
+				}
+			}
+			if downloadURL != "" {
+				m.UpdateState.URL = downloadURL
+				// Start download in a goroutine and send messages via a channel
+				progressChan := make(chan UpdateProgressMsg)
+				go r2d2.DownloadWithProgress(downloadURL, func(s r2d2.UpdateState) {
+					progressChan <- UpdateProgressMsg{State: s}
+				})
+				return m, listenForUpdate(progressChan)
+			}
+		}
+	case UpdateProgressMsg:
+		m.UpdateState = msg.State
+		if m.UpdateState.Error != nil {
+			m.Updating = false
+			r2d2.LogError(m.UpdateState.Error, "Download failed")
+			return m, nil
+		}
+		if m.UpdateState.Done {
+			return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+				r2d2.RestartApp()
+				return nil
+			})
+		}
+		// Continue listening for progress on the same channel
+		return m, listenForUpdate(msg.Sub)
 	case tea.WindowSizeMsg:
 		m.Width, m.Height = msg.Width, msg.Height
 	case blinkMsg:
@@ -268,9 +348,9 @@ func (m MonitorModel) View() string {
 	theme := Themes[m.Config.ThemeIdx]
 	W, H := m.Width, m.Height
 	
-	if !m.Ready {
-		art := strings.Join(R2Reactions["idle"].Art, "\n")
-		return lipgloss.Place(W, H, lipgloss.Center, lipgloss.Center, lipgloss.NewStyle().Foreground(theme.CPU).Render(art))
+	if !m.Ready || m.Updating {
+		art := m.renderR2Box(W, H, theme)
+		return lipgloss.Place(W, H, lipgloss.Center, lipgloss.Center, art)
 	}
 
 	// Get layout dimensions from preset controller
