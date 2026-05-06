@@ -20,10 +20,9 @@
 ```
 
 R2-D2 Monitor It’s a Windows-native TUI built in Go that leverages native WMI and PowerShell integration to deliver fast, deep telemetry directly to your terminal with company of a droid.
-
 R2 has reactive states. He "jitters" when he's processing data, enters a panicked "Alarm" mode if your CPU/Temps spike, and whistles when you successfully kill a process. He’s constantly scanning the system and bleeping about kernel stability.
 
-<img width="1912" height="1006" alt="readme" src="https://github.com/user-attachments/assets/853270ab-b45f-40e0-a477-5ca16fcad52a" />
+https://github.com/user-attachments/assets/6586a622-cd2a-4d99-82a2-c943bfddfb82
 
 ## Key Features
 
