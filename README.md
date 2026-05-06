@@ -35,7 +35,16 @@ R2 has reactive states. He "jitters" when he's processing data, enters a panicke
 - Auto-Updates: Transparent version checking and self-updating via GitHub API.
 - Portability: Zero installation; configuration and logs are kept in the executable's directory.
 - Layout Presets: Four predefined layouts (FULL, COMPACT, NET-FOCUS, CPU-ONLY) optimized for different monitoring scenarios.
-- Responsive Design: Fluid layout that adapts to any terminal size automatically.
+- **Interactive Droid Behavior**: A "living" droid with 5+ reactive states, spontaneous dialogues, and jitter animations that respond to system events.
+- **Responsive Design**: Fluid layout that adapts to any terminal size automatically.
+
+## Interactive Droid Behavior
+
+R2-D2 is not just a static asset; he is a reactive companion with his own behavior logic:
+- **Reactive Moods**: His ASCII face and dialogues change based on your actions (Idle, Thinking, Scanning, Success, and Alarm).
+- **Spontaneous Interaction**: R2 will occasionally "talk" to the system, analyzing kernels or background tasks even when you aren't interacting with him.
+- **Visual Feedback**: Watch him "jitter" with kinetic energy when he's processing data or enter a panicked "Alarm" state if your CPU or temperatures reach critical levels.
+- **Action Success**: He whistles and chirps with joy when a command (like terminating a process) is completed successfully.
 
 ## Quick Start
 

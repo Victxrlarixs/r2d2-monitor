@@ -376,6 +376,9 @@ func (m MonitorModel) View() string {
 	if layout.ShowMemory && dims.MemoryBox.Width > 0 {
 		leftPanels = append(leftPanels, m.renderMemBox(dims.MemoryBox.Width, dims.MemoryBox.Height, theme))
 	}
+	if layout.ShowGPU && dims.GPUBox.Width > 0 {
+		leftPanels = append(leftPanels, m.renderGPUBox(dims.GPUBox.Width, dims.GPUBox.Height, theme))
+	}
 	if layout.ShowDisk && dims.DiskBox.Width > 0 {
 		leftPanels = append(leftPanels, m.renderDiskBox(dims.DiskBox.Width, dims.DiskBox.Height, theme))
 	}

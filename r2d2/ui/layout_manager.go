@@ -14,6 +14,7 @@ const (
 	PanelDisk
 	PanelNetwork
 	PanelProcess
+	PanelGPU
 )
 
 // Rectangle defines a rectangular area with position and dimensions
@@ -29,6 +30,7 @@ type PanelDimensions struct {
 	DiskBox    Rectangle
 	NetworkBox Rectangle
 	ProcessBox Rectangle
+	GPUBox     Rectangle
 	Footer     Rectangle
 }
 
@@ -40,6 +42,7 @@ type LayoutConfig struct {
 	ShowDisk     bool
 	ShowNetwork  bool
 	ShowProcess  bool
+	ShowGPU      bool
 	
 	// Dimension ratios (0.0 to 1.0)
 	LeftPanelRatio     float64
@@ -105,6 +108,7 @@ var MinPanelDimensions = map[PanelType]struct{ Width, Height int }{
 	PanelDisk:    {Width: 25, Height: 7},
 	PanelNetwork: {Width: 25, Height: 8},
 	PanelProcess: {Width: 40, Height: 10},
+	PanelGPU:     {Width: 25, Height: 6},
 }
 
 // LayoutCalculator handles the complex logic of panel positioning and sizing
@@ -163,6 +167,7 @@ func (lc *LayoutCalculator) Calculate(config *LayoutConfig, width, height int) *
 		height int
 	}{
 		{config.ShowMemory, &dims.MemoryBox, 8},
+		{config.ShowGPU, &dims.GPUBox, 6},
 		{config.ShowDisk, &dims.DiskBox, 7},
 		{config.ShowNetwork, &dims.NetworkBox, int(float64(availableH) * config.NetworkHeightRatio)},
 	}

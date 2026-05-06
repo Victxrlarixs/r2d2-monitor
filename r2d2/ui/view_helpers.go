@@ -320,3 +320,58 @@ func (m MonitorModel) renderNetBox(w, h int, theme Theme) string {
 
 	return RenderBox(w, h, title, b.String(), borderCol)
 }
+
+// ── GPU ──────────────────────────────────────────────────────────────────────
+
+func (m MonitorModel) renderGPUBox(w, h int, theme Theme) string {
+	var b strings.Builder
+	if !m.Stats.GPU.Available {
+		b.WriteString("\n  GPU Telemetry Offline\n  (Check drivers/WMI)")
+		return RenderBox(w, h, " GPU ", b.String(), lipgloss.Color("#30363D"))
+	}
+
+	barW := w - 20
+	if barW < 4 { barW = 4 }
+
+	gpuColor := barColor(m.Stats.GPU.Utilization, theme)
+	if gpuColor == theme.CPU {
+		gpuColor = theme.RAM
+	}
+
+	// Header: Model Name
+	modelSt := lipgloss.NewStyle().Foreground(gpuColor).Bold(true)
+	b.WriteString(modelSt.Render(" "+truncate(m.Stats.GPU.Name, w-6)) + "\n")
+
+	// Load Bar
+	pctSt := lipgloss.NewStyle().Foreground(gpuColor).Bold(true)
+	b.WriteString(fmt.Sprintf(" LOAD %s %s\n",
+		ProgressBar(m.Stats.GPU.Utilization, barW, gpuColor),
+		pctSt.Render(fmt.Sprintf("%5.1f%%", m.Stats.GPU.Utilization)),
+	))
+
+	// Temperature & Power (if available)
+	detailSt := lipgloss.NewStyle().Foreground(lipgloss.Color("#8B949E"))
+	if m.Stats.GPU.Temp > 0 {
+		tempColor := barColor(m.Stats.GPU.Temp, theme)
+		tempSt := lipgloss.NewStyle().Foreground(tempColor).Bold(true)
+		b.WriteString(fmt.Sprintf(" TEMP %s   POWER %.1fW\n",
+			tempSt.Render(fmt.Sprintf("%.0f°C", m.Stats.GPU.Temp)),
+			m.Stats.GPU.Power))
+	} else {
+		b.WriteString("\n")
+	}
+
+	// VRAM Bar
+	if m.Stats.GPU.VRAMTotal > 0 {
+		vramPct := (m.Stats.GPU.VRAMUsed / m.Stats.GPU.VRAMTotal) * 100
+		vramColor := barColor(vramPct, theme)
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#30363D")).Render(strings.Repeat("─", w-4)) + "\n")
+		b.WriteString(fmt.Sprintf(" VRAM %s %s\n",
+			ProgressBar(vramPct, barW, vramColor),
+			lipgloss.NewStyle().Foreground(vramColor).Bold(true).Render(fmt.Sprintf("%5.1f%%", vramPct)),
+		))
+		b.WriteString(detailSt.Render(fmt.Sprintf("      %.1f / %.1f GB\n", m.Stats.GPU.VRAMUsed/1024, m.Stats.GPU.VRAMTotal/1024)))
+	}
+
+	return RenderBox(w, h, " GPU ", b.String(), gpuColor)
+}

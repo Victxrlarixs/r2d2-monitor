@@ -9,6 +9,7 @@ var PresetConfigs = map[int]*LayoutConfig{
 		ShowDisk:    true,
 		ShowNetwork: true,
 		ShowProcess: true,
+		ShowGPU:     true,
 		LeftPanelRatio:     0.38,
 		NetworkHeightRatio: 0.25,
 		PanelPriorities: map[PanelType]int{
@@ -17,7 +18,8 @@ var PresetConfigs = map[int]*LayoutConfig{
 			PanelMemory:  3,
 			PanelR2D2:    4,
 			PanelNetwork: 5,
-			PanelDisk:    6, // Lowest priority
+			PanelGPU:     6,
+			PanelDisk:    7, // Lowest priority
 		},
 	},
 	1: { // COMPACT - No R2-D2, more space for processes
@@ -27,6 +29,7 @@ var PresetConfigs = map[int]*LayoutConfig{
 		ShowDisk:    true,
 		ShowNetwork: true,
 		ShowProcess: true,
+		ShowGPU:     true,
 		LeftPanelRatio:     0.25, // Smaller left panel
 		NetworkHeightRatio: 0.25,
 		PanelPriorities: map[PanelType]int{
@@ -34,7 +37,8 @@ var PresetConfigs = map[int]*LayoutConfig{
 			PanelCPU:     2,
 			PanelMemory:  3,
 			PanelNetwork: 4,
-			PanelDisk:    5,
+			PanelGPU:     5,
+			PanelDisk:    6,
 		},
 	},
 	2: { // NET-FOCUS - Enlarged network panel, no disk
@@ -44,6 +48,7 @@ var PresetConfigs = map[int]*LayoutConfig{
 		ShowDisk:    false, // Hidden to make room for network
 		ShowNetwork: true,
 		ShowProcess: true,
+		ShowGPU:     true,
 		LeftPanelRatio:     0.35,
 		NetworkHeightRatio: 0.60, // 60% more space for network
 		PanelPriorities: map[PanelType]int{
@@ -52,6 +57,7 @@ var PresetConfigs = map[int]*LayoutConfig{
 			PanelCPU:     3,
 			PanelMemory:  4,
 			PanelR2D2:    5,
+			PanelGPU:     6,
 		},
 	},
 	3: { // CPU-ONLY - Only CPU and processes for performance debugging
