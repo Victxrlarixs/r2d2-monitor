@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v3/process"
+	"strings"
 )
 
 // Commander defines the behavior for executing system instructions.
@@ -14,30 +15,25 @@ type Commander interface {
 	Execute(cmdStr string) (string, error)
 }
 
-// PSExecutor is a concrete implementation of Commander using PowerShell.
-type PSExecutor struct{}
+// ShellExecutor executes commands via the system shell (cmd.exe on Windows).
+// This is faster than PowerShell while still handling argument strings correctly.
+type ShellExecutor struct{}
 
-// Execute runs a PowerShell command and returns the combined output or an error.
-func (e *PSExecutor) Execute(cmdStr string) (string, error) {
-	cmd := exec.Command("powershell", "-NoProfile", "-Command", cmdStr)
-
+func (e *ShellExecutor) Execute(cmdStr string) (string, error) {
+	cmd := exec.Command("cmd", "/C", cmdStr)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-
 	err := cmd.Run()
 	if err != nil {
-		if stderr.String() != "" {
-			return stderr.String(), err
-		}
-		return out.String(), err
+		return out.String(), fmt.Errorf("%v: %s", err, stderr.String())
 	}
 	return out.String(), nil
 }
 
 // DefaultExecutor is a global instance for standard command execution.
-var DefaultExecutor Commander = &PSExecutor{}
+var DefaultExecutor Commander = &ShellExecutor{}
 
 // ExecuteCommand provides a package-level entry point for command execution.
 func ExecuteCommand(cmdStr string) (string, error) {
@@ -78,7 +74,12 @@ func GetFullProcessInfo(pidStr string) string {
 	if err != nil { return "Process not found" }
 
 	name, _ := p.Name()
-	status, _ := p.Status()
+	statusSlice, _ := p.Status()
+	status := strings.Join(statusSlice, ", ")
+	if status == "" {
+		status = "Unknown"
+	}
+	
 	createTime, _ := p.CreateTime()
 	parent, _ := p.Parent()
 	parentPID := int32(0)
@@ -88,7 +89,12 @@ func GetFullProcessInfo(pidStr string) string {
 	io, _ := p.IOCounters()
 	mem, _ := p.MemoryInfo()
 
-	elapsed := time.Since(time.Unix(createTime/1000, 0)).Truncate(time.Second)
+	var elapsed string
+	if createTime > 0 {
+		elapsed = time.Since(time.Unix(createTime/1000, 0)).Truncate(time.Second).String()
+	} else {
+		elapsed = "Unknown"
+	}
 
 	res := fmt.Sprintf("STATUS: %s\n", status)
 	res += fmt.Sprintf("ELAPSED: %s\n", elapsed)

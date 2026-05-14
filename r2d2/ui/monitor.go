@@ -54,7 +54,7 @@ func InitialMonitor(sm *r2d2.StatsManager, cfg r2d2.Config) MonitorModel {
 		SM:          sm,
 		Config:      cfg,
 		CurrentFace: "idle",
-		Sorting:     "cpu",
+		Sorting:     strings.ToLower(cfg.SortBy),
 		PresetController: NewPresetController(cfg.LayoutPreset),
 	}
 	m.setReaction("idle", 0)
@@ -133,10 +133,6 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.DisplayMsg == "" {
 		m.setReaction("idle", 0)
 	}
-	if m.Stats.CPU > 90 || m.Stats.RAM > 90 {
-		if m.CurrentFace != "alarm" { m.setReaction("alarm", time.Second*5) }
-	}
-
 	if m.Stats.CPU > 90 || m.Stats.RAM > 90 {
 		if m.CurrentFace != "alarm" { m.setReaction("alarm", time.Second*5) }
 	}
@@ -221,7 +217,10 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				entries := m.visibleEntries()
 				if m.Cursor < len(entries) {
 					m.setReaction("alarm", time.Second*4)
-					r2d2.KillProcess(entries[m.Cursor].ID)
+					_, err := r2d2.KillProcess(entries[m.Cursor].ID)
+					if err != nil {
+						r2d2.LogError(err, "Failed to kill process from UI")
+					}
 				}
 				m.ConfirmKill = false
 			default:
@@ -287,8 +286,18 @@ func (m MonitorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, r2d2.ScanProcessCmd(m.SelectedProcess.ID))
 				}
 			} else { m.setReaction("idle", 0) }
-		case key.Matches(msg, DefaultKeyMap.SortCPU): m.Sorting = "cpu" ; m.setReaction("thinking", time.Second*2)
-		case key.Matches(msg, DefaultKeyMap.SortMem): m.Sorting = "mem" ; m.setReaction("thinking", time.Second*2)
+		case key.Matches(msg, DefaultKeyMap.SortCPU):
+			m.Sorting = "cpu"
+			m.Config.SortBy = "cpu"
+			m.setReaction("thinking", time.Second*2)
+			r2d2.SaveConfig(m.Config)
+			cmds = append(cmds, r2d2.GetStatsCmd(m.SM, m.getVisiblePIDs(), m.Config))
+		case key.Matches(msg, DefaultKeyMap.SortMem):
+			m.Sorting = "mem"
+			m.Config.SortBy = "mem"
+			m.setReaction("thinking", time.Second*2)
+			r2d2.SaveConfig(m.Config)
+			cmds = append(cmds, r2d2.GetStatsCmd(m.SM, m.getVisiblePIDs(), m.Config))
 		case key.Matches(msg, DefaultKeyMap.Theme):
 			m.Config.ThemeIdx = (m.Config.ThemeIdx + 1) % len(Themes)
 			r2d2.LogAction("UI", fmt.Sprintf("Theme changed to: %s", Themes[m.Config.ThemeIdx].Name))

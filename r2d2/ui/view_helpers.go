@@ -8,6 +8,16 @@ import (
 	"github.com/victx/r2d2-monitor/r2d2"
 )
 
+var (
+	// Pre-defined styles for performance
+	styleBase       = lipgloss.NewStyle().Padding(0, 1)
+	styleEmptyTrack = lipgloss.NewStyle().Foreground(lipgloss.Color("#2A2A2A"))
+	styleBorder     = lipgloss.RoundedBorder()
+	styleGrayDetail = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B949E"))
+	styleDivider    = lipgloss.NewStyle().Foreground(lipgloss.Color("#30363D"))
+	styleTitleBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#000000")).Bold(true).Padding(0, 1)
+)
+
 // barColor returns a dynamic color based on usage level: green → amber → red.
 func barColor(pct float64, theme Theme) lipgloss.Color {
 	if pct >= 90 { return lipgloss.Color("#FF1744") }
@@ -23,7 +33,7 @@ func ProgressBar(percent float64, width int, color lipgloss.Color) string {
 	if f < 0 { f = 0 }
 	e := width - f
 	filled := lipgloss.NewStyle().Foreground(color).Render(strings.Repeat("▓", f))
-	empty  := lipgloss.NewStyle().Foreground(lipgloss.Color("#2A2A2A")).Render(strings.Repeat("░", e))
+	empty  := styleEmptyTrack.Render(strings.Repeat("░", e))
 	return filled + empty
 }
 
@@ -50,8 +60,10 @@ func BrailleSparkline(data []float64, width int, color lipgloss.Color) string {
 func RenderBox(width, height int, title string, content string, color lipgloss.Color) string {
 	innerW := width - 4
 	innerH := height - 2
-	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+	
+	// Re-use style but update dynamic properties
+	boxStyle := lipgloss.NewStyle().
+		Border(styleBorder).
 		BorderForeground(color).
 		Width(width - 2).
 		Height(height - 2).
@@ -59,26 +71,31 @@ func RenderBox(width, height int, title string, content string, color lipgloss.C
 
 	lines := strings.Split(content, "\n")
 	var clamped strings.Builder
+	clamped.Grow(width * height)
 	for i := 0; i < innerH; i++ {
 		if i < len(lines) {
 			l := lines[i]
 			if lipgloss.Width(l) > innerW { l = truncate(l, innerW) }
-			clamped.WriteString(l + "\n")
+			clamped.WriteString(l)
+			clamped.WriteByte('\n')
 		} else {
-			clamped.WriteString("\n")
+			clamped.WriteByte('\n')
 		}
 	}
 
-	rendered := style.Render(strings.TrimSuffix(clamped.String(), "\n"))
-	boxLines := strings.Split(rendered, "\n")
-	if len(boxLines) > 0 && title != "" {
-		tStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#000000")).Background(color).Bold(true).Padding(0, 1)
-		tText  := tStyle.Render(title)
-		pad    := width - lipgloss.Width(tText) - 3
-		if pad < 0 { pad = 0 }
-		boxLines[0] = "╭─" + tText + strings.Repeat("─", pad) + "╮"
+	rendered := boxStyle.Render(strings.TrimSuffix(clamped.String(), "\n"))
+	
+	if title != "" {
+		boxLines := strings.Split(rendered, "\n")
+		if len(boxLines) > 0 {
+			tText := styleTitleBadge.Background(color).Render(title)
+			pad := width - lipgloss.Width(tText) - 3
+			if pad < 0 { pad = 0 }
+			boxLines[0] = "╭─" + tText + strings.Repeat("─", pad) + "╮"
+			return strings.Join(boxLines, "\n")
+		}
 	}
-	return strings.Join(boxLines, "\n")
+	return rendered
 }
 
 // ── CPU ──────────────────────────────────────────────────────────────────────
